@@ -1,0 +1,24 @@
+# Python / Virtual Environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Database & Environment Variables
+*.db
+*.sqlite3
+.env
+
+# Node / React Frontend
+node_modules/
+dist/
+.vite/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
