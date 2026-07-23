@@ -14,6 +14,7 @@ class ScoreRead(ScoreBase):
     id: str
     candidate_id: str
     reviewer_id: str
+    reviewer_email: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -46,6 +47,7 @@ class CandidateRead(BaseModel):
     skills: Optional[str] = None
     internal_notes: Optional[str] = None
     ai_summary: Optional[str] = None
+    average_score: Optional[float] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
