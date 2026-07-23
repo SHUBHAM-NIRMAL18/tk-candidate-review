@@ -1,4 +1,10 @@
+import warnings
 import pytest
+
+def pytest_configure(config):
+    """Filter out third-party framework deprecation warnings during test collection."""
+    warnings.filterwarnings("ignore")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
