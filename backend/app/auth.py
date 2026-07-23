@@ -1,4 +1,6 @@
 import os
+import uuid
+import logging
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -9,10 +11,20 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
+from app.models.blacklisted_token import BlacklistedToken
+
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "secret-key-change-me")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+
+# Warn loudly if SECRET_KEY is left as the insecure default
+if SECRET_KEY == "secret-key-change-me":
+    logger.warning(
+        "!!!! SECRET_KEY is set to the insecure default. !!!! "
+        "Set a strong SECRET_KEY environment variable before deploying to production."
+    )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -30,7 +42,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    to_encode.update({"exp": expire})
+    # Unique token ID for blacklisting support on logout
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_current_user(
@@ -43,7 +56,7 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     # Priority: HttpOnly Cookie > Bearer Header
     token = request.cookies.get("access_token") or bearer_token
     if not token:
@@ -52,9 +65,14 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
+        jti: str = payload.get("jti")
         if not user_id:
             raise credentials_exception
     except JWTError:
+        raise credentials_exception
+
+    # Reject tokens that have been blacklisted via logout
+    if jti and db.query(BlacklistedToken).filter(BlacklistedToken.jti == jti).first():
         raise credentials_exception
 
     user = db.query(User).filter(User.id == user_id).first()
@@ -63,6 +81,7 @@ def get_current_user(
     return user
 
 def require_role(allowed_roles: list[str]):
+    """Dependency that enforces role-based access control at the router level."""
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
@@ -71,3 +90,4 @@ def require_role(allowed_roles: list[str]):
             )
         return current_user
     return role_checker
+
