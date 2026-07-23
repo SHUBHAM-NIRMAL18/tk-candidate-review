@@ -9,3 +9,18 @@ services:
       - ./backend:/app
     environment:
       - PORT=8000
+      - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
