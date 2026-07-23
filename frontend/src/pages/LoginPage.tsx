@@ -9,7 +9,6 @@ export const LoginPage: React.FC = () => {
   const [toast, setToast] = useState<ToastData | null>(null);
 
   useEffect(() => {
-    // Consume any pending toast (e.g. from Register or Logout)
     const pendingToast = consumeToast();
     if (pendingToast) {
       setToast(pendingToast);
