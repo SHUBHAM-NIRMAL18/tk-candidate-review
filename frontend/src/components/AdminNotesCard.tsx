@@ -74,11 +74,11 @@ export const AdminNotesCard: React.FC<AdminNotesCardProps> = ({
               onChange={(e) => handleStatusSelect(e.target.value)}
               disabled={updatingStatus}
             >
-              <option value="new">new</option>
-              <option value="reviewed">reviewed</option>
-              <option value="hired">hired</option>
-              <option value="rejected">rejected</option>
-              <option value="archived">archived</option>
+              <option value="new">New</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="hired">Hired</option>
+              <option value="rejected">Rejected</option>
+              <option value="archived">Archived</option>
             </select>
           </div>
 
