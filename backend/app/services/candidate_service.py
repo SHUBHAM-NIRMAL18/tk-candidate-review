@@ -142,13 +142,14 @@ def get_candidate_detail_service(db: Session, candidate_id: str, current_user: U
     return CandidateDetailRead(**cand_dict, scores=score_reads)
 
 def create_candidate_service(db: Session, candidate_in: CandidateCreate, current_user: User) -> CandidateRead:
+    notes = candidate_in.internal_notes if current_user.role == "admin" else None
     candidate = Candidate(
         name=candidate_in.name,
         email=candidate_in.email,
         role_applied=candidate_in.role_applied,
         status=candidate_in.status,
         skills=candidate_in.skills,
-        internal_notes=candidate_in.internal_notes
+        internal_notes=notes
     )
     db.add(candidate)
     db.commit()
@@ -209,14 +210,26 @@ async def create_score_service(
             detail="Candidate not found"
         )
 
-    score_obj = Score(
-        candidate_id=candidate_id,
-        reviewer_id=current_user.id,
-        category=score_in.category,
-        score=score_in.score,
-        note=score_in.note
-    )
-    db.add(score_obj)
+    existing_score = db.query(Score).filter(
+        Score.candidate_id == candidate_id,
+        Score.reviewer_id == current_user.id,
+        Score.category == score_in.category
+    ).first()
+
+    if existing_score:
+        existing_score.score = score_in.score
+        existing_score.note = score_in.note
+        score_obj = existing_score
+    else:
+        score_obj = Score(
+            candidate_id=candidate_id,
+            reviewer_id=current_user.id,
+            category=score_in.category,
+            score=score_in.score,
+            note=score_in.note
+        )
+        db.add(score_obj)
+
     db.commit()
     db.refresh(score_obj)
 
