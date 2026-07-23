@@ -163,7 +163,7 @@ export const DashboardPage: React.FC = () => {
 
       <header className="dashboard-header">
         <div className="header-left">
-          <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="dashboard-logo" />
+          <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="dashboard-logo" style={{ height: '18px', width: 'auto', display: 'block' }} />
           <span className="app-title">Candidate Review Dashboard</span>
         </div>
 
@@ -306,78 +306,147 @@ export const DashboardPage: React.FC = () => {
               <p>No candidates found matching the selected filters.</p>
             </div>
           ) : (
-            <table className="candidate-table">
-              <thead>
-                <tr>
-                  <th>Candidate Name</th>
-                  <th>Role Applied</th>
-                  <th>Status</th>
-                  <th>Skills</th>
-                  <th>Avg Score</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Desktop Table View */}
+              <div className="desktop-table-view">
+                <table className="candidate-table">
+                  <thead>
+                    <tr>
+                      <th>Candidate Name</th>
+                      <th>Role Applied</th>
+                      <th>Status</th>
+                      <th>Skills</th>
+                      <th>Avg Score</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {candidates.map((cand) => (
+                      <tr
+                        key={cand.id}
+                        onClick={() => navigate(`/candidate/${cand.id}`)}
+                        className="clickable-row"
+                      >
+                        <td data-label="Candidate">
+                          <div className="candidate-cell">
+                            <strong className="candidate-name-link">{cand.name}</strong>
+                            <span className="candidate-email">{cand.email}</span>
+                          </div>
+                        </td>
+                        <td data-label="Role Applied">{cand.role_applied}</td>
+                        <td data-label="Status">
+                          <span className={`status-badge ${cand.status}`}>
+                            {cand.status}
+                          </span>
+                        </td>
+                        <td data-label="Skills">
+                          <div className="skill-badges">
+                            {cand.skills
+                              ? cand.skills.split(',').slice(0, 3).map((s, idx) => (
+                                  <span key={idx} className="mini-skill-badge">
+                                    {s.trim()}
+                                  </span>
+                                ))
+                              : '—'}
+                          </div>
+                        </td>
+                        <td data-label="Avg Score">
+                          <strong className="candidate-score-pill">
+                            {cand.average_score !== null && cand.average_score !== undefined
+                              ? `★ ${cand.average_score}`
+                              : '--'}
+                          </strong>
+                        </td>
+                        <td data-label="Actions" onClick={(e) => e.stopPropagation()}>
+                          <div className="action-buttons">
+                            <button
+                              onClick={() => navigate(`/candidate/${cand.id}`)}
+                              className="action-btn view-btn"
+                            >
+                              <ExternalLink size={14} />
+                              <span>Review</span>
+                            </button>
+
+                            <button
+                              onClick={() => setArchiveCandidateTarget(cand)}
+                              className="action-btn archive-icon-btn"
+                              title="Archive Candidate"
+                            >
+                              <Archive size={14} />
+                              <span>Archive</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Candidate Cards View */}
+              <div className="mobile-candidate-cards">
                 {candidates.map((cand) => (
-                  <tr
+                  <div
                     key={cand.id}
+                    className="mobile-candidate-card"
                     onClick={() => navigate(`/candidate/${cand.id}`)}
-                    className="clickable-row"
                   >
-                    <td>
+                    <div className="mobile-card-top">
                       <div className="candidate-cell">
                         <strong className="candidate-name-link">{cand.name}</strong>
                         <span className="candidate-email">{cand.email}</span>
                       </div>
-                    </td>
-                    <td>{cand.role_applied}</td>
-                    <td>
                       <span className={`status-badge ${cand.status}`}>
                         {cand.status}
                       </span>
-                    </td>
-                    <td>
-                      <div className="skill-badges">
-                        {cand.skills
-                          ? cand.skills.split(',').slice(0, 3).map((s, idx) => (
-                              <span key={idx} className="mini-skill-badge">
-                                {s.trim()}
-                              </span>
-                            ))
-                          : '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <strong className="candidate-score-pill">
-                        {cand.average_score !== null && cand.average_score !== undefined
-                          ? `★ ${cand.average_score}`
-                          : '--'}
-                      </strong>
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="action-buttons">
-                        <button
-                          onClick={() => navigate(`/candidate/${cand.id}`)}
-                          className="action-btn view-btn"
-                        >
-                          <ExternalLink size={14} />
-                          <span>Review</span>
-                        </button>
+                    </div>
 
-                        <button
-                          onClick={() => setArchiveCandidateTarget(cand)}
-                          className="action-btn archive-icon-btn"
-                          title="Archive Candidate"
-                        >
-                          <Archive size={14} />
-                          <span>Archive</span>
-                        </button>
+                    <div className="mobile-card-meta">
+                      <div className="meta-item">
+                        <span className="meta-label">Role:</span>
+                        <span className="meta-val">{cand.role_applied}</span>
                       </div>
-                    </td>
-                  </tr>
+                      <div className="meta-item">
+                        <span className="meta-label">Avg Score:</span>
+                        <strong className="candidate-score-pill">
+                          {cand.average_score !== null && cand.average_score !== undefined
+                            ? `★ ${cand.average_score}`
+                            : '--'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {cand.skills && (
+                      <div className="skill-badges">
+                        {cand.skills.split(',').slice(0, 4).map((s, idx) => (
+                          <span key={idx} className="mini-skill-badge">
+                            {s.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mobile-card-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => navigate(`/candidate/${cand.id}`)}
+                        className="action-btn view-btn"
+                      >
+                        <ExternalLink size={14} />
+                        <span>Review Profile</span>
+                      </button>
+
+                      <button
+                        onClick={() => setArchiveCandidateTarget(cand)}
+                        className="action-btn archive-icon-btn"
+                      >
+                        <Archive size={14} />
+                        <span>Archive</span>
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
 
           <div className="pagination-bar">
