@@ -22,7 +22,7 @@
 }
 
 .dashboard-logo {
-  height: 36px;
+  height: 18px !important;
   width: auto;
 }
 
@@ -313,7 +313,7 @@
 .candidate-table {
   width: 100%;
   border-collapse: collapse;
-  text-align: left;
+  text-align: center;
 }
 
 .candidate-table th,
@@ -321,6 +321,8 @@
   padding: 0.875rem 1rem;
   border-bottom: 1px solid #f1f5f9;
   font-size: 0.875rem;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .candidate-table th {
@@ -328,6 +330,7 @@
   color: #475569;
   background-color: #f8fafc;
   letter-spacing: 0.02em;
+  text-align: center;
 }
 
 .clickable-row {
@@ -342,6 +345,7 @@
 .candidate-cell {
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 .candidate-name-link {
@@ -361,7 +365,7 @@
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
-  text-transform: lowercase;
+  text-transform: capitalize;
 }
 
 .status-badge.new { background: #dbeafe; color: #1e40af; }
@@ -374,6 +378,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
+  justify-content: center;
 }
 
 .mini-skill-badge {
@@ -399,6 +404,7 @@
 .action-buttons {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 }
 
@@ -505,3 +511,191 @@
   background: #f8fafc;
   border-color: #94a3b8;
 }
+
+/* Mobile & Tablet Responsiveness */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .header-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-title {
+    font-size: 0.9375rem;
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-main {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .welcome-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1rem;
+  }
+
+  .welcome-banner h1 {
+    font-size: 1.25rem;
+  }
+
+  .btn-add-candidate {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-container {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-controls-group {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .search-box,
+  .select-filter,
+  .input-filter-sm {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .candidate-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .candidate-table th,
+  .candidate-table td {
+    padding: 0.625rem 0.5rem;
+    font-size: 0.8125rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .pagination-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .pagination-controls-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+.desktop-table-view {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.mobile-candidate-cards {
+  display: none;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .desktop-table-view {
+    display: none;
+  }
+
+  .mobile-candidate-cards {
+    display: flex;
+  }
+
+  .mobile-candidate-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .mobile-candidate-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .mobile-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .mobile-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    padding: 0.625rem 0.875rem;
+    border-radius: 8px;
+    font-size: 0.8438rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .meta-label {
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .meta-val {
+    color: #0f172a;
+    font-weight: 600;
+  }
+
+  .mobile-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+
+  .mobile-card-actions .action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+
