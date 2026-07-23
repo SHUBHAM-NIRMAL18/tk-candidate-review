@@ -45,7 +45,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       body: JSON.stringify({ email, password }),
     });
 
-    // Save toast before updating context user state
     triggerToast(
       'Login Successfully!',
       `Signed in successfully! Welcome back, ${res.user.email}.`,
@@ -61,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       body: JSON.stringify({ email, password }),
     });
 
-    // Save toast for login page before clearing registration session
     triggerToast(
       'Register Successfully!',
       `Account for ${email} registered successfully! Please sign in below.`,
@@ -71,14 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await apiFetch('/api/v1/auth/logout', { method: 'POST' });
     } catch {
-      // Ignore
     } finally {
       setUser(null);
     }
   };
 
   const logout = async () => {
-    // Save toast for login page before clearing user state
     triggerToast(
       'Logout Successfully!',
       'Session logged out successfully!',
@@ -88,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await apiFetch('/api/v1/auth/logout', { method: 'POST' });
     } catch {
-      // Ignore
     } finally {
       setUser(null);
     }
