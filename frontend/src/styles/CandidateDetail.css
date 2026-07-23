@@ -331,7 +331,8 @@
   padding: 0.75rem 0.875rem;
   border-bottom: 1px solid #f1f5f9;
   font-size: 0.875rem;
-  text-align: left;
+  text-align: center;
+  vertical-align: middle;
   word-break: break-word;
   overflow-wrap: break-word;
 }
@@ -340,6 +341,7 @@
   background-color: #f8fafc;
   color: #475569;
   font-weight: 700;
+  text-align: center;
 }
 
 .reviewer-email-td {
@@ -543,6 +545,9 @@
   font-size: 0.875rem;
   outline: none;
   background: #ffffff;
+  text-transform: capitalize;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .admin-button-group {
@@ -588,3 +593,143 @@
   background: #dc2626;
   color: #ffffff;
 }
+
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+  .detail-layout {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem;
+  }
+
+  .candidate-header-title h1 {
+    font-size: 1.25rem;
+  }
+
+  .detail-card {
+    padding: 1rem;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+    gap: 0.875rem;
+  }
+
+  .scores-table-wrap {
+    overflow-x: hidden;
+  }
+
+  .scores-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .scores-table th,
+  .scores-table td {
+    padding: 0.5rem 0.375rem;
+    font-size: 0.7813rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .form-group-inline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+
+  .form-group-inline label {
+    width: auto;
+  }
+
+  .admin-card-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.875rem;
+  }
+
+  .admin-button-group {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn-save-notes,
+  .btn-archive-admin {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.desktop-scores-table {
+  width: 100%;
+}
+
+.mobile-score-cards {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .desktop-scores-table {
+    display: none;
+  }
+
+  .mobile-score-cards {
+    display: flex;
+  }
+
+  .mobile-score-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mobile-score-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .score-category {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .mobile-score-reviewer {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+  }
+
+  .reviewer-label {
+    color: #64748b;
+  }
+
+  .mobile-score-note {
+    margin: 0;
+    font-size: 0.8438rem;
+    color: #475569;
+    font-style: italic;
+    word-break: break-word;
+  }
+
+  .mobile-score-footer {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+
