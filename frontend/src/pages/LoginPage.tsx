@@ -1,19 +1,35 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { AuthForm } from '../components/AuthForm';
+import { Toast } from '../components/Toast';
+import { consumeToast, type ToastData } from '../utils/toast';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  useEffect(() => {
+    // Consume any pending toast (e.g. from Register or Logout)
+    const pendingToast = consumeToast();
+    if (pendingToast) {
+      setToast(pendingToast);
+    }
+  }, []);
 
   const handleLogin = async (email: string, password: string) => {
     await login(email, password);
-    navigate('/', { replace: true });
   };
 
   return (
     <div className="auth-page-container">
+      {toast && (
+        <Toast
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       <AuthForm mode="login" onSubmit={handleLogin} />
     </div>
   );

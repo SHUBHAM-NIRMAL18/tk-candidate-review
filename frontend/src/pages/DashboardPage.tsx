@@ -1,38 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/useAuth';
 import { LogOut, Users, FileCheck, Star, Shield, Search } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Toast } from '../components/Toast';
+import { consumeToast, type ToastData } from '../utils/toast';
 import '../styles/DashboardPage.css';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showLogoutToast, setShowLogoutToast] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  useEffect(() => {
+    // Consume Login Successfully toast when arriving at Dashboard
+    const pendingToast = consumeToast();
+    if (pendingToast) {
+      setToast(pendingToast);
+    }
+  }, []);
 
   const handleConfirmLogout = async () => {
     try {
       setIsLoggingOut(true);
       setShowLogoutModal(false);
-      setShowLogoutToast(true);
-
-      // Display top-right side toast for 1.5s before redirecting
-      await new Promise((resolve) => setTimeout(resolve, 1500));
       await logout();
     } finally {
       setIsLoggingOut(false);
-      setShowLogoutToast(false);
     }
   };
 
   return (
     <div className="dashboard-layout">
-      {showLogoutToast && (
+      {toast && (
         <Toast
-          title="Logout Successfully!"
-          message="Session logged out successfully! Redirecting to Sign In..."
-          onClose={() => setShowLogoutToast(false)}
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
 
