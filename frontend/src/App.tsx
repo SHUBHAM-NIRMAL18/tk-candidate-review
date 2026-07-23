@@ -5,6 +5,7 @@ import { useAuth } from './context/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { CandidateDetailPage } from './pages/CandidateDetailPage';
 import './styles/App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -13,7 +14,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   if (loading) {
     return (
       <div className="auth-page-container">
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.9375rem', fontWeight: 500 }}>
+        <div style={{ color: '#64748b', fontSize: '0.9375rem', fontWeight: 500 }}>
           Loading authentication session...
         </div>
       </div>
@@ -61,6 +62,14 @@ export const AppContent: React.FC = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/candidate/:id"
+        element={
+          <ProtectedRoute>
+            <CandidateDetailPage />
           </ProtectedRoute>
         }
       />
