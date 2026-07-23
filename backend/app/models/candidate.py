@@ -7,7 +7,7 @@ class Candidate(Base, TimestampMixin):
 
     id = Column(String, primary_key=True, default=generate_uuid, index=True)
     name = Column(String, nullable=False)
-    email = Column(String, nullable=False, index=True)
+    email = Column(String, nullable=False, unique=True, index=True)
     role_applied = Column(String, nullable=False, index=True)
     status = Column(String, nullable=False, default="new", index=True)
     skills = Column(Text, nullable=True)
