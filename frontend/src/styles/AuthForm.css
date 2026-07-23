@@ -100,13 +100,17 @@
 .input-icon {
   position: absolute;
   left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-muted);
   pointer-events: none;
+  z-index: 2;
+  transition: color 0.2s ease;
 }
 
 .input-wrapper input {
   width: 100%;
-  padding: 0.75rem 0.875rem 0.75rem 2.625rem;
+  padding: 0.75rem 0.875rem 0.75rem 2.75rem;
   font-size: 0.9375rem;
   font-family: inherit;
   color: var(--text-main);
@@ -115,6 +119,10 @@
   border-radius: 8px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-wrapper:focus-within .input-icon {
+  color: var(--primary-color);
 }
 
 .input-wrapper input:focus {
