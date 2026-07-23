@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
-import { Toast } from './Toast';
 import '../styles/AuthForm.css';
 
 interface AuthFormProps {
@@ -24,7 +23,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
 
   const isRegister = mode === 'register';
 
@@ -66,17 +64,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
 
     try {
       setLoading(true);
-
-      // Display top-right side toast FIRST
-      setShowToast(true);
-
-      // Wait 1.5 seconds for user to see the top-right toast
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Perform authentication API call & navigate
       await onSubmit(email.trim(), password);
     } catch (err: any) {
-      setShowToast(false);
       setErrors({
         form: err.message || 'Authentication failed. Please check your credentials.',
       });
@@ -86,140 +75,126 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
   };
 
   return (
-    <>
-      {showToast && (
-        <Toast
-          title={isRegister ? 'Register Successfully!' : 'Login Successfully!'}
-          message={
-            isRegister
-              ? 'Account registered successfully! Redirecting to Login...'
-              : 'Signed in successfully! Accessing Dashboard...'
-          }
-          onClose={() => setShowToast(false)}
-        />
+    <div className="auth-card">
+      <div className="auth-header">
+        <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="auth-logo" />
+        <h2 className="auth-title">
+          {isRegister ? 'Create an Account' : 'Welcome Back'}
+        </h2>
+        <p className="auth-subtitle">
+          {isRegister 
+            ? 'Register to review candidates and manage evaluations' 
+            : 'Sign in to access your Candidate Review Dashboard'}
+        </p>
+      </div>
+
+      {errors.form && (
+        <div className="auth-alert error">
+          <AlertCircle className="alert-icon" size={18} />
+          <span>{errors.form}</span>
+        </div>
       )}
 
-      <div className="auth-card">
-        <div className="auth-header">
-          <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="auth-logo" />
-          <h2 className="auth-title">
-            {isRegister ? 'Create an Account' : 'Welcome Back'}
-          </h2>
-          <p className="auth-subtitle">
-            {isRegister 
-              ? 'Register to review candidates and manage evaluations' 
-              : 'Sign in to access your Candidate Review Dashboard'}
-          </p>
+      <form onSubmit={handleSubmit} className="auth-form" noValidate>
+        <div className="form-group">
+          <label htmlFor="email">
+            Email Address <span className="required-asterisk">*</span>
+          </label>
+          <div className={`input-wrapper ${errors.email ? 'input-error' : ''}`}>
+            <Mail className="input-icon" size={18} />
+            <input
+              id="email"
+              type="email"
+              placeholder="you@techkraft.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+              }}
+              disabled={loading}
+            />
+          </div>
+          {errors.email && <span className="field-error-text">{errors.email}</span>}
         </div>
 
-        {errors.form && (
-          <div className="auth-alert error">
-            <AlertCircle className="alert-icon" size={18} />
-            <span>{errors.form}</span>
+        <div className="form-group">
+          <label htmlFor="password">
+            Password <span className="required-asterisk">*</span>
+          </label>
+          <div className={`input-wrapper ${errors.password ? 'input-error' : ''}`}>
+            <Lock className="input-icon" size={18} />
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+              disabled={loading}
+            />
+          </div>
+          {errors.password && <span className="field-error-text">{errors.password}</span>}
+        </div>
+
+        {isRegister && (
+          <div className="form-group">
+            <label htmlFor="confirmPassword">
+              Confirm Password <span className="required-asterisk">*</span>
+            </label>
+            <div className={`input-wrapper ${errors.confirmPassword ? 'input-error' : ''}`}>
+              <Lock className="input-icon" size={18} />
+              <input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                }}
+                disabled={loading}
+              />
+            </div>
+            {errors.confirmPassword && (
+              <span className="field-error-text">{errors.confirmPassword}</span>
+            )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="auth-form" noValidate>
-          <div className="form-group">
-            <label htmlFor="email">
-              Email Address <span className="required-asterisk">*</span>
-            </label>
-            <div className={`input-wrapper ${errors.email ? 'input-error' : ''}`}>
-              <Mail className="input-icon" size={18} />
-              <input
-                id="email"
-                type="email"
-                placeholder="you@techkraft.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-                }}
-                disabled={loading}
-              />
-            </div>
-            {errors.email && <span className="field-error-text">{errors.email}</span>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">
-              Password <span className="required-asterisk">*</span>
-            </label>
-            <div className={`input-wrapper ${errors.password ? 'input-error' : ''}`}>
-              <Lock className="input-icon" size={18} />
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-                }}
-                disabled={loading}
-              />
-            </div>
-            {errors.password && <span className="field-error-text">{errors.password}</span>}
-          </div>
-
-          {isRegister && (
-            <div className="form-group">
-              <label htmlFor="confirmPassword">
-                Confirm Password <span className="required-asterisk">*</span>
-              </label>
-              <div className={`input-wrapper ${errors.confirmPassword ? 'input-error' : ''}`}>
-                <Lock className="input-icon" size={18} />
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-                  }}
-                  disabled={loading}
-                />
-              </div>
-              {errors.confirmPassword && (
-                <span className="field-error-text">{errors.confirmPassword}</span>
-              )}
-            </div>
-          )}
-
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="spinner" size={18} />
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <span>{isRegister ? 'Register' : 'Sign In'}</span>
-                <ArrowRight size={18} />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="auth-footer">
-          {isRegister ? (
-            <p>
-              Already have an account?{' '}
-              <Link to="/login" className="auth-link">
-                Sign in
-              </Link>
-            </p>
+        <button type="submit" className="auth-submit-btn" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="spinner" size={18} />
+              <span>Processing...</span>
+            </>
           ) : (
-            <p>
-              Don't have an account?{' '}
-              <Link to="/register" className="auth-link">
-                Register
-              </Link>
-            </p>
+            <>
+              <span>{isRegister ? 'Register' : 'Sign In'}</span>
+              <ArrowRight size={18} />
+            </>
           )}
-        </div>
+        </button>
+      </form>
+
+      <div className="auth-footer">
+        {isRegister ? (
+          <p>
+            Already have an account?{' '}
+            <Link to="/login" className="auth-link">
+              Sign in
+            </Link>
+          </p>
+        ) : (
+          <p>
+            Don't have an account?{' '}
+            <Link to="/register" className="auth-link">
+              Register
+            </Link>
+          </p>
+        )}
       </div>
-    </>
+    </div>
   );
 };
