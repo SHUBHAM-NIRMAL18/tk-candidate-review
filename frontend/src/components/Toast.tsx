@@ -25,7 +25,7 @@ export const Toast: React.FC<ToastProps> = ({ title, message, type = 'success', 
         </button>
       )}
       <div className="toast-progress">
-        <div className="toast-progress-fill" />
+        <div className="toast-progress-fill" onAnimationEnd={onClose} />
       </div>
     </div>
   );
