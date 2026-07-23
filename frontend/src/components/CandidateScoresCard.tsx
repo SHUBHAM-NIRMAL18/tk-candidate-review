@@ -53,41 +53,72 @@ export const CandidateScoresCard: React.FC<CandidateScoresCardProps> = ({
         </div>
       ) : (
         <div className="scores-table-wrap">
-          <table className="scores-table">
-            <thead>
-              <tr>
-                {isAdmin && <th style={{ width: '25%' }}>Reviewer</th>}
-                <th style={{ width: isAdmin ? '22%' : '30%' }}>Category</th>
-                <th style={{ width: isAdmin ? '15%' : '20%' }}>Score</th>
-                <th style={{ width: isAdmin ? '26%' : '35%' }}>Note</th>
-                <th style={{ width: isAdmin ? '12%' : '15%' }}>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scores.map((s) => (
-                <tr key={s.id}>
-                  {isAdmin && (
-                    <td className="reviewer-email-td">
-                      {s.reviewer_email || 'Reviewer'}
-                    </td>
-                  )}
-                  <td>
-                    <strong>{s.category}</strong>
-                  </td>
-                  <td>
-                    <div className="rating-stars-badge">
-                      <Star size={14} className="star-icon" />
-                      <span>{s.score} / 5</span>
-                    </div>
-                  </td>
-                  <td className="note-td">{s.note ? `"${s.note}"` : '—'}</td>
-                  <td className="date-td">
-                    {new Date(s.created_at).toLocaleDateString()}
-                  </td>
+          {/* Desktop Table View */}
+          <div className="desktop-scores-table">
+            <table className="scores-table">
+              <thead>
+                <tr>
+                  {isAdmin && <th style={{ width: '25%' }}>Reviewer</th>}
+                  <th style={{ width: isAdmin ? '22%' : '30%' }}>Category</th>
+                  <th style={{ width: isAdmin ? '15%' : '20%' }}>Score</th>
+                  <th style={{ width: isAdmin ? '26%' : '35%' }}>Note</th>
+                  <th style={{ width: isAdmin ? '12%' : '15%' }}>Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {scores.map((s) => (
+                  <tr key={s.id}>
+                    {isAdmin && (
+                      <td className="reviewer-email-td">
+                        {s.reviewer_email || 'Reviewer'}
+                      </td>
+                    )}
+                    <td>
+                      <strong>{s.category}</strong>
+                    </td>
+                    <td>
+                      <div className="rating-stars-badge">
+                        <Star size={14} className="star-icon" />
+                        <span>{s.score} / 5</span>
+                      </div>
+                    </td>
+                    <td className="note-td">{s.note ? `"${s.note}"` : '—'}</td>
+                    <td className="date-td">
+                      {new Date(s.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Score Cards View */}
+          <div className="mobile-score-cards">
+            {scores.map((s) => (
+              <div key={s.id} className="mobile-score-card">
+                <div className="mobile-score-top">
+                  <strong className="score-category">{s.category}</strong>
+                  <div className="rating-stars-badge">
+                    <Star size={14} className="star-icon" />
+                    <span>{s.score} / 5</span>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="mobile-score-reviewer">
+                    <span className="reviewer-label">Reviewer:</span>
+                    <span className="reviewer-email-td">{s.reviewer_email || 'Reviewer'}</span>
+                  </div>
+                )}
+
+                {s.note && <p className="mobile-score-note">"{s.note}"</p>}
+
+                <div className="mobile-score-footer">
+                  <span className="date-td">{new Date(s.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
 
           {isAdmin && scores.length > 0 && (
             <div className="avg-score-summary-bar">
