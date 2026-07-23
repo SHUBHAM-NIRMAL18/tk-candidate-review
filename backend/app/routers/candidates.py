@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.auth import get_current_user
+from app.auth import get_current_user, require_role
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateUpdate,
@@ -67,11 +67,12 @@ def get_candidate(
 ):
     return get_candidate_detail_service(db=db, candidate_id=candidate_id, current_user=current_user)
 
+# Admin-only: only admins can modify candidate profiles (name, status, notes, etc.)
 @router.patch("/{candidate_id}", response_model=CandidateRead)
 def update_candidate(
     candidate_id: str,
     candidate_in: CandidateUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db)
 ):
     return update_candidate_service(
@@ -81,10 +82,11 @@ def update_candidate(
         current_user=current_user
     )
 
+# Admin-only: soft delete sets status='archived', never hard-deletes
 @router.delete("/{candidate_id}")
 def delete_candidate(
     candidate_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db)
 ):
     return soft_delete_candidate_service(db=db, candidate_id=candidate_id)
@@ -116,6 +118,7 @@ async def stream_candidate_scores(
     candidate_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    """SSE stream that sends refresh signals when new scores are submitted."""
     queue = broadcaster.subscribe(candidate_id)
 
     async def event_generator():
@@ -129,3 +132,4 @@ async def stream_candidate_scores(
             broadcaster.unsubscribe(candidate_id, queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
