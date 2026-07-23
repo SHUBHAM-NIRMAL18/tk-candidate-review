@@ -2,7 +2,7 @@ import asyncio
 import math
 from typing import Dict, List, Optional, Set
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.models.candidate import Candidate
@@ -91,6 +91,14 @@ def list_candidates_service(
         cand_dict = CandidateRead.model_validate(c).model_dump()
         if current_user.role != "admin":
             cand_dict["internal_notes"] = None
+
+        scores = db.query(Score.score).filter(Score.candidate_id == c.id).all()
+        if scores:
+            avg = sum(s[0] for s in scores) / len(scores)
+            cand_dict["average_score"] = round(avg, 1)
+        else:
+            cand_dict["average_score"] = None
+
         items.append(CandidateRead(**cand_dict))
 
     return CandidateListResponse(
@@ -109,16 +117,27 @@ def get_candidate_detail_service(db: Session, candidate_id: str, current_user: U
             detail="Candidate not found"
         )
 
-    score_query = db.query(Score).filter(Score.candidate_id == candidate_id)
+    score_query = db.query(Score, User.email).outerjoin(User, Score.reviewer_id == User.id).filter(Score.candidate_id == candidate_id)
     if current_user.role != "admin":
         score_query = score_query.filter(Score.reviewer_id == current_user.id)
 
-    scores = score_query.order_by(Score.created_at.desc()).all()
-    score_reads = [ScoreRead.model_validate(s) for s in scores]
+    results = score_query.order_by(Score.created_at.desc()).all()
+    score_reads = []
+    for s_obj, u_email in results:
+        s_dict = ScoreRead.model_validate(s_obj).model_dump()
+        s_dict["reviewer_email"] = u_email
+        score_reads.append(ScoreRead(**s_dict))
 
     cand_dict = CandidateRead.model_validate(candidate).model_dump()
     if current_user.role != "admin":
         cand_dict["internal_notes"] = None
+
+    all_scores = db.query(Score.score).filter(Score.candidate_id == candidate_id).all()
+    if all_scores:
+        avg = sum(s[0] for s in all_scores) / len(all_scores)
+        cand_dict["average_score"] = round(avg, 1)
+    else:
+        cand_dict["average_score"] = None
 
     return CandidateDetailRead(**cand_dict, scores=score_reads)
 
@@ -201,7 +220,9 @@ async def create_score_service(
     db.commit()
     db.refresh(score_obj)
 
-    score_read = ScoreRead.model_validate(score_obj)
+    score_dict = ScoreRead.model_validate(score_obj).model_dump()
+    score_dict["reviewer_email"] = current_user.email
+    score_read = ScoreRead(**score_dict)
 
     sse_data = f"data: {score_read.model_dump_json()}\n\n"
     await broadcaster.broadcast(candidate_id, sse_data)
