@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, ShieldCheck, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import './AuthForm.css';
 
 interface AuthFormProps {
@@ -66,17 +66,14 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
     try {
       setLoading(true);
       
-      // Perform registration/login API request
       await onSubmit(email.trim(), password);
 
-      // Display success modal overlay
       const successText = isRegister 
-        ? `Account for ${email.trim()} registered successfully as Reviewer! Redirecting...` 
-        : `Signed in successfully as ${email.trim()}! Redirecting...`;
+        ? `Account registered successfully! Redirecting...` 
+        : `Signed in successfully! Redirecting...`;
       
       setSuccessMessage(successText);
 
-      // Keep success popup visible for 1.5s before redirect completes
       await new Promise((resolve) => setTimeout(resolve, 1500));
     } catch (err: any) {
       setErrors({
@@ -121,15 +118,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
           <div className="auth-alert error">
             <AlertCircle className="alert-icon" size={18} />
             <span>{errors.form}</span>
-          </div>
-        )}
-
-        {isRegister && (
-          <div className="role-security-badge">
-            <ShieldCheck className="shield-icon" size={18} />
-            <div>
-              <strong>Role Enforcement:</strong> New registrations strictly default to the <span>Reviewer</span> role.
-            </div>
           </div>
         )}
 
@@ -209,7 +197,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
               </>
             ) : (
               <>
-                <span>{isRegister ? 'Register Account' : 'Sign In'}</span>
+                <span>{isRegister ? 'Register' : 'Sign In'}</span>
                 <ArrowRight size={18} />
               </>
             )}
@@ -228,7 +216,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
             <p>
               Don't have an account?{' '}
               <Link to="/register" className="auth-link">
-                Register as Reviewer
+                Register
               </Link>
             </p>
           )}
