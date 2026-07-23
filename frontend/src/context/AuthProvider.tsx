@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { User } from '../types/auth';
 import { apiFetch } from '../api/client';
 import { AuthContext } from './AuthContext';
+import { triggerToast } from '../utils/toast';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -43,22 +44,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+
+    // Save toast before updating context user state
+    triggerToast(
+      'Login Successfully!',
+      `Signed in successfully! Welcome back, ${res.user.email}.`,
+      'success'
+    );
+
     setUser(res.user);
   };
 
   const register = async (email: string, password: string) => {
-    const res = await apiFetch<{ user: User }>('/api/v1/auth/register', {
+    await apiFetch<{ user: User }>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    setUser(res.user);
-  };
 
-  const logout = async () => {
+    // Save toast for login page before clearing registration session
+    triggerToast(
+      'Register Successfully!',
+      `Account for ${email} registered successfully! Please sign in below.`,
+      'success'
+    );
+
     try {
       await apiFetch('/api/v1/auth/logout', { method: 'POST' });
     } catch {
-      // Clear state on logout
+      // Ignore
+    } finally {
+      setUser(null);
+    }
+  };
+
+  const logout = async () => {
+    // Save toast for login page before clearing user state
+    triggerToast(
+      'Logout Successfully!',
+      'Session logged out successfully!',
+      'success'
+    );
+
+    try {
+      await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore
     } finally {
       setUser(null);
     }
