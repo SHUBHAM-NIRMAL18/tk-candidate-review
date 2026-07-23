@@ -5,98 +5,93 @@ from app.models.score import Score
 from app.auth import hash_password
 
 def seed_database(db: Session):
-    if db.query(User).first():
-        return
+    admin_user = db.query(User).filter(User.email == "admin@techkraft.com").first()
+    if not admin_user:
+        admin_user = User(
+            email="admin@techkraft.com",
+            hashed_password=hash_password("adminpassword"),
+            role="admin"
+        )
+        db.add(admin_user)
+        db.commit()
+        db.refresh(admin_user)
 
-    admin_user = User(
-        email="admin@techkraft.com",
-        hashed_password=hash_password("adminpassword"),
-        role="admin"
-    )
-    reviewer1 = User(
-        email="reviewer1@techkraft.com",
-        hashed_password=hash_password("reviewerpassword"),
-        role="reviewer"
-    )
-    reviewer2 = User(
-        email="reviewer2@techkraft.com",
-        hashed_password=hash_password("reviewerpassword"),
-        role="reviewer"
-    )
+    reviewer1 = db.query(User).filter(User.email == "reviewer1@techkraft.com").first()
+    if not reviewer1:
+        reviewer1 = User(
+            email="reviewer1@techkraft.com",
+            hashed_password=hash_password("reviewerpassword"),
+            role="reviewer"
+        )
+        db.add(reviewer1)
+        db.commit()
+        db.refresh(reviewer1)
 
-    db.add_all([admin_user, reviewer1, reviewer2])
-    db.commit()
-    db.refresh(admin_user)
-    db.refresh(reviewer1)
-    db.refresh(reviewer2)
+    reviewer2 = db.query(User).filter(User.email == "reviewer2@techkraft.com").first()
+    if not reviewer2:
+        reviewer2 = User(
+            email="reviewer2@techkraft.com",
+            hashed_password=hash_password("reviewerpassword"),
+            role="reviewer"
+        )
+        db.add(reviewer2)
+        db.commit()
+        db.refresh(reviewer2)
 
-    cand1 = Candidate(
-        name="Alex Rivera",
-        email="alex.rivera@example.com",
-        role_applied="Full Stack Engineer",
-        status="reviewed",
-        skills="Python, FastAPI, React, PostgreSQL, Docker",
-        internal_notes="Candidate demonstrated strong knowledge of async concurrency and clean API architecture.",
-        ai_summary="Alex Rivera applied for Full Stack Engineer. Key skills include Python, FastAPI, React, PostgreSQL, Docker. Based on evaluation reviews, maintains a strong rating."
-    )
-    cand2 = Candidate(
-        name="Sophia Chen",
-        email="sophia.chen@example.com",
-        role_applied="Frontend Engineer",
-        status="new",
-        skills="React, TypeScript, Vite, CSS, State Management",
-        internal_notes="Impressive portfolio design. Scheduled for technical interview next week."
-    )
-    cand3 = Candidate(
-        name="Marcus Vance",
-        email="marcus.vance@example.com",
-        role_applied="Backend Engineer",
-        status="hired",
-        skills="Python, Go, SQLAlchemy, Redis, System Design",
-        internal_notes="Offer accepted. Starting next month."
-    )
-    cand4 = Candidate(
-        name="Elena Rostova",
-        email="elena.rostova@example.com",
-        role_applied="DevOps Lead",
-        status="rejected",
-        skills="Docker, Kubernetes, Terraform, AWS, CI/CD",
-        internal_notes="Lacked required hands-on experience in high-throughput streaming systems."
-    )
+    nepali_candidates = [
+        {
+            "name": "Ram Sharma",
+            "email": "ram.sharma@example.com",
+            "role_applied": "Full Stack Engineer",
+            "status": "reviewed",
+            "skills": "Python, FastAPI, React, PostgreSQL, Docker",
+            "internal_notes": "Demonstrated exceptional competence in system design and async API concurrency.",
+            "ai_summary": "Ram Sharma applied for Full Stack Engineer. Key skills include Python, FastAPI, React, PostgreSQL, Docker. Based on evaluation reviews, maintains a strong 4.5/5.0 rating."
+        },
+        {
+            "name": "Sita Adhikari",
+            "email": "sita.adhikari@example.com",
+            "role_applied": "Frontend Engineer",
+            "status": "new",
+            "skills": "React, TypeScript, Vite, TailwindCSS, State Management",
+            "internal_notes": "Impressive portfolio design and clean component modularity. Scheduled for interview."
+        },
+        {
+            "name": "Bikash Gurung",
+            "email": "bikash.gurung@example.com",
+            "role_applied": "Backend Engineer",
+            "status": "hired",
+            "skills": "Python, Go, SQLAlchemy, Redis, System Design",
+            "internal_notes": "Offer accepted. Joining the engineering team next month."
+        },
+        {
+            "name": "Anjali Thapa",
+            "email": "anjali.thapa@example.com",
+            "role_applied": "DevOps Lead",
+            "status": "rejected",
+            "skills": "Docker, Kubernetes, Terraform, AWS, CI/CD",
+            "internal_notes": "Salary expectations exceeded position budget."
+        },
+        {
+            "name": "Aayush Shrestha",
+            "email": "aayush.shrestha@example.com",
+            "role_applied": "Full Stack Engineer",
+            "status": "new",
+            "skills": "Node.js, React, Express, PostgreSQL, GraphQL",
+            "internal_notes": "Strong candidate with solid open-source contributions."
+        }
+    ]
 
-    db.add_all([cand1, cand2, cand3, cand4])
-    db.commit()
-    db.refresh(cand1)
-    db.refresh(cand2)
+    for cdata in nepali_candidates:
+        existing = db.query(Candidate).filter(Candidate.email == cdata["email"]).first()
+        if not existing:
+            cand = Candidate(**cdata)
+            db.add(cand)
+            db.commit()
+            db.refresh(cand)
 
-    score1 = Score(
-        candidate_id=cand1.id,
-        reviewer_id=reviewer1.id,
-        category="System Architecture",
-        score=5,
-        note="Excellent API schema and modular service layer structure."
-    )
-    score2 = Score(
-        candidate_id=cand1.id,
-        reviewer_id=reviewer1.id,
-        category="Code Quality",
-        score=4,
-        note="Clean typing and error handling throughout."
-    )
-    score3 = Score(
-        candidate_id=cand1.id,
-        reviewer_id=reviewer2.id,
-        category="Problem Solving",
-        score=5,
-        note="Quickly identified memory consumption bottlenecks."
-    )
-    score4 = Score(
-        candidate_id=cand2.id,
-        reviewer_id=reviewer2.id,
-        category="UI/UX Design",
-        score=4,
-        note="Solid component modularity and responsive styling."
-    )
-
-    db.add_all([score1, score2, score3, score4])
-    db.commit()
+            if cand.email == "ram.sharma@example.com":
+                s1 = Score(candidate_id=cand.id, reviewer_id=reviewer1.id, category="System Architecture", score=5, note="Excellent API schema and modular service layer structure.")
+                s2 = Score(candidate_id=cand.id, reviewer_id=reviewer2.id, category="Problem Solving", score=4, note="Quickly identified memory consumption bottlenecks.")
+                db.add_all([s1, s2])
+                db.commit()
