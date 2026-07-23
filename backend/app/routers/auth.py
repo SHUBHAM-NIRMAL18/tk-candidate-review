@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,8 +8,19 @@ from app.auth import hash_password, verify_password, create_access_token, get_cu
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
+def set_auth_cookie(response: Response, token: str):
+    """Set HttpOnly, SameSite=Lax cookie for secure token storage."""
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=86400 * 7, # 7 days
+        path="/"
+    )
+
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-def register_user(user_in: UserRegister, db: Session = Depends(get_db)):
+def register_user(user_in: UserRegister, response: Response, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -28,10 +39,11 @@ def register_user(user_in: UserRegister, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     access_token = create_access_token(data={"sub": new_user.id, "role": new_user.role})
+    set_auth_cookie(response, access_token)
     return Token(access_token=access_token, token_type="bearer", user=UserRead.model_validate(new_user))
 
 @router.post("/login", response_model=Token)
-def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
+def login_user(user_in: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_in.email).first()
     if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
@@ -40,8 +52,15 @@ def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
         )
 
     access_token = create_access_token(data={"sub": user.id, "role": user.role})
+    set_auth_cookie(response, access_token)
     return Token(access_token=access_token, token_type="bearer", user=UserRead.model_validate(user))
+
+@router.post("/logout")
+def logout_user(response: Response):
+    response.delete_cookie(key="access_token", path="/")
+    return {"message": "Logged out successfully"}
 
 @router.get("/me", response_model=UserRead)
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     return current_user
+
