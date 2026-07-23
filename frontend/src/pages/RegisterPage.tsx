@@ -9,7 +9,7 @@ export const RegisterPage: React.FC = () => {
 
   const handleRegister = async (email: string, password: string) => {
     await register(email, password);
-    navigate('/', { replace: true });
+    navigate('/login', { replace: true });
   };
 
   return (

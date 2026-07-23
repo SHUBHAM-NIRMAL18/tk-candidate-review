@@ -1,13 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { LogOut, Users, FileCheck, Star, Shield, Search } from 'lucide-react';
-import './DashboardPage.css';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { Toast } from '../components/Toast';
+import '../styles/DashboardPage.css';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutToast, setShowLogoutToast] = useState(false);
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      setShowLogoutModal(false);
+      setShowLogoutToast(true);
+
+      // Display top-right side toast for 1.5s before redirecting
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await logout();
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutToast(false);
+    }
+  };
 
   return (
     <div className="dashboard-layout">
+      {showLogoutToast && (
+        <Toast
+          title="Logout Successfully!"
+          message="Session logged out successfully! Redirecting to Sign In..."
+          onClose={() => setShowLogoutToast(false)}
+        />
+      )}
+
+      {showLogoutModal && (
+        <ConfirmModal
+          title="Confirm Logout"
+          message="Are you sure you want to log out of your session?"
+          confirmLabel="Logout"
+          cancelLabel="Cancel"
+          loading={isLoggingOut}
+          onConfirm={handleConfirmLogout}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
+
       <header className="dashboard-header">
         <div className="header-left">
           <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="dashboard-logo" />
@@ -23,7 +63,11 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
 
-          <button onClick={logout} className="logout-btn" title="Sign Out">
+          <button 
+            onClick={() => setShowLogoutModal(true)} 
+            className="logout-btn" 
+            title="Sign Out"
+          >
             <LogOut size={16} />
             <span>Logout</span>
           </button>

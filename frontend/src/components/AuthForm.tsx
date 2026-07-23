@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import './AuthForm.css';
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Toast } from './Toast';
+import '../styles/AuthForm.css';
 
 interface AuthFormProps {
   mode: 'login' | 'register';
@@ -23,7 +24,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
 
   const isRegister = mode === 'register';
 
@@ -65,17 +66,17 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
 
     try {
       setLoading(true);
-      
-      await onSubmit(email.trim(), password);
 
-      const successText = isRegister 
-        ? `Account registered successfully! Redirecting...` 
-        : `Signed in successfully! Redirecting...`;
-      
-      setSuccessMessage(successText);
+      // Display top-right side toast FIRST
+      setShowToast(true);
 
+      // Wait 1.5 seconds for user to see the top-right toast
       await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Perform authentication API call & navigate
+      await onSubmit(email.trim(), password);
     } catch (err: any) {
+      setShowToast(false);
       setErrors({
         form: err.message || 'Authentication failed. Please check your credentials.',
       });
@@ -86,19 +87,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode, onSubmit }) => {
 
   return (
     <>
-      {successMessage && (
-        <div className="success-popup-overlay">
-          <div className="success-popup-card">
-            <div className="success-icon-wrapper">
-              <CheckCircle2 className="success-icon" size={32} />
-            </div>
-            <h3>{isRegister ? 'Registration Successful!' : 'Welcome Back!'}</h3>
-            <p>{successMessage}</p>
-            <div className="popup-progress-bar">
-              <div className="popup-progress-fill" />
-            </div>
-          </div>
-        </div>
+      {showToast && (
+        <Toast
+          title={isRegister ? 'Register Successfully!' : 'Login Successfully!'}
+          message={
+            isRegister
+              ? 'Account registered successfully! Redirecting to Login...'
+              : 'Signed in successfully! Accessing Dashboard...'
+          }
+          onClose={() => setShowToast(false)}
+        />
       )}
 
       <div className="auth-card">

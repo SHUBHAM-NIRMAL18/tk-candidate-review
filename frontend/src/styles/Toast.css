@@ -1,0 +1,129 @@
+.toast-notification {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 320px;
+  max-width: 400px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem 1.25rem 1.25rem 1rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.toast-notification.success {
+  border-left: 4px solid #16a34a;
+}
+
+.toast-notification.error {
+  border-left: 4px solid #dc2626;
+}
+
+.toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.toast-notification.success .toast-icon {
+  color: #16a34a;
+}
+
+.toast-notification.error .toast-icon {
+  color: #dc2626;
+}
+
+.toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  text-align: left;
+}
+
+.toast-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.toast-message {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.125rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.toast-close-btn:hover {
+  color: var(--text-main);
+  background-color: var(--bg-color);
+}
+
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--border-color);
+}
+
+.toast-notification.success .toast-progress-fill {
+  height: 100%;
+  background-color: #16a34a;
+  animation: progressFill 1.5s linear forwards;
+}
+
+.toast-notification.error .toast-progress-fill {
+  height: 100%;
+  background-color: #dc2626;
+  animation: progressFill 1.5s linear forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes progressFill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .toast-notification {
+    top: 1rem;
+    right: 1rem;
+    left: 1rem;
+    min-width: auto;
+    max-width: none;
+  }
+}
