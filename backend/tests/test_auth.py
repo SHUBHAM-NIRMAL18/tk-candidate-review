@@ -29,11 +29,13 @@ def test_token_blacklisting_on_logout(client, db_session):
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    me_before = client.get("/api/v1/auth/me", headers=headers, cookies={"access_token": token})
+    client.cookies.set("access_token", token)
+
+    me_before = client.get("/api/v1/auth/me", headers=headers)
     assert me_before.status_code == 200
 
-    logout_res = client.post("/api/v1/auth/logout", headers=headers, cookies={"access_token": token})
+    logout_res = client.post("/api/v1/auth/logout", headers=headers)
     assert logout_res.status_code == 200
 
-    me_after = client.get("/api/v1/auth/me", headers=headers, cookies={"access_token": token})
+    me_after = client.get("/api/v1/auth/me", headers=headers)
     assert me_after.status_code == 401
