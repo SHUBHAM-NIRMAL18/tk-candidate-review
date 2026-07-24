@@ -10,11 +10,25 @@ A quick note on time: the brief gives a 2.5-hour target, but there is no scoring
 
 ### Prerequisites
 - Docker Desktop (for Windows / macOS) or Docker Engine + Docker Compose (for Linux) installed and running.
+- Git installed on your system.
 
-### Launch
-```bash
-docker-compose up --build -d
-```
+### Quick Start
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/SHUBHAM-NIRMAL18/tk-candidate-review.git
+   ```
+
+2. **Navigate into the project directory:**
+   ```bash
+   cd tk-candidate-review
+   ```
+
+3. **Launch the application with Docker:**
+   ```bash
+   docker-compose up --build -d
+   ```
+   *(or `docker compose up --build -d` depending on your Docker setup)*
 
 ### Access Points
 
