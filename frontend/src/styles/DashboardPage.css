@@ -333,6 +333,42 @@
   text-align: center;
 }
 
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sortable-th:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+.sortable-th.active-sort {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sort-header-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.sort-icon {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.sort-icon.default {
+  opacity: 0.4;
+}
+
+.sort-icon.active {
+  opacity: 1;
+  color: #2563eb;
+}
+
 .clickable-row {
   cursor: pointer;
   transition: background 0.15s ease;
