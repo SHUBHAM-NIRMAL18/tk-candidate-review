@@ -10,6 +10,15 @@ interface AddCandidateModalProps {
   userRole?: string;
 }
 
+interface FieldErrors {
+  name?: string;
+  email?: string;
+  roleApplied?: string;
+  form?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
   isOpen,
   onClose,
@@ -22,15 +31,36 @@ export const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
   const [skills, setSkills] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   if (!isOpen) return null;
 
+  const validateForm = (): boolean => {
+    const newErrors: FieldErrors = {};
+
+    if (!name.trim()) {
+      newErrors.name = 'Full name is required.';
+    }
+
+    if (!email.trim()) {
+      newErrors.email = 'Email address is required.';
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address (e.g. alex@example.com).';
+    }
+
+    if (!roleApplied.trim()) {
+      newErrors.roleApplied = 'Role applied is required.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!name.trim() || !email.trim() || !roleApplied.trim()) {
-      setError('Name, email, and role applied are required.');
+    setErrors({});
+
+    if (!validateForm()) {
       return;
     }
 
@@ -46,9 +76,9 @@ export const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
       onClose();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        setErrors({ form: err.message });
       } else {
-        setError('Failed to create candidate');
+        setErrors({ form: 'Failed to create candidate' });
       }
     } finally {
       setLoading(false);
@@ -68,46 +98,64 @@ export const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-body">
-          {error && <div className="form-error">{error}</div>}
+        <form onSubmit={handleSubmit} className="modal-body" noValidate>
+          {errors.form && <div className="form-error">{errors.form}</div>}
 
           <div className="form-group">
-            <label htmlFor="cand-name">Full Name *</label>
+            <label htmlFor="cand-name">
+              Full Name <span className="required-asterisk">*</span>
+            </label>
             <input
               id="cand-name"
               type="text"
               placeholder="e.g. Alex Rivera"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              className={errors.name ? 'input-error' : ''}
               disabled={loading}
-              required
             />
+            {errors.name && <span className="field-error-text">{errors.name}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="cand-email">Email Address *</label>
+            <label htmlFor="cand-email">
+              Email Address <span className="required-asterisk">*</span>
+            </label>
             <input
               id="cand-email"
               type="email"
               placeholder="e.g. alex.rivera@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+              }}
+              className={errors.email ? 'input-error' : ''}
               disabled={loading}
-              required
             />
+            {errors.email && <span className="field-error-text">{errors.email}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="cand-role">Role Applied *</label>
+            <label htmlFor="cand-role">
+              Role Applied <span className="required-asterisk">*</span>
+            </label>
             <input
               id="cand-role"
               type="text"
               placeholder="e.g. Full Stack Engineer"
               value={roleApplied}
-              onChange={(e) => setRoleApplied(e.target.value)}
+              onChange={(e) => {
+                setRoleApplied(e.target.value);
+                if (errors.roleApplied) setErrors((prev) => ({ ...prev, roleApplied: undefined }));
+              }}
+              className={errors.roleApplied ? 'input-error' : ''}
               disabled={loading}
-              required
             />
+            {errors.roleApplied && <span className="field-error-text">{errors.roleApplied}</span>}
           </div>
 
           <div className="form-group">
