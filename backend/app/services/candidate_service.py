@@ -50,6 +50,8 @@ def list_candidates_service(
     role_applied: Optional[str] = None,
     skill: Optional[str] = None,
     keyword: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_order: Optional[str] = "desc",
     page: int = 1,
     page_size: int = 20,
 ) -> CandidateListResponse:
@@ -84,7 +86,22 @@ def list_candidates_service(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    candidates = query.order_by(Candidate.created_at.desc()).offset(offset).limit(page_size).all()
+    is_asc = (sort_order or "").lower() == "asc"
+
+    if sort_by == "average_score":
+        avg_score_expr = func.coalesce(func.avg(Score.score), -1)
+        query = query.outerjoin(Score, Candidate.id == Score.candidate_id).group_by(Candidate.id)
+        if is_asc:
+            query = query.order_by(avg_score_expr.asc(), Candidate.created_at.desc())
+        else:
+            query = query.order_by(avg_score_expr.desc(), Candidate.created_at.desc())
+    elif sort_by in ("name", "role_applied", "status", "created_at"):
+        col = getattr(Candidate, sort_by)
+        query = query.order_by(col.asc() if is_asc else col.desc())
+    else:
+        query = query.order_by(Candidate.created_at.desc())
+
+    candidates = query.offset(offset).limit(page_size).all()
 
     items = []
     for c in candidates:
