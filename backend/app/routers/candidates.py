@@ -35,6 +35,8 @@ def list_candidates(
     role_applied: Optional[str] = Query(None, description="Filter by role applied"),
     skill: Optional[str] = Query(None, description="Filter by skill tag"),
     keyword: Optional[str] = Query(None, description="Search keyword in name, email, skills"),
+    sort_by: Optional[str] = Query(None, description="Sort column: average_score, name, role_applied, status, created_at"),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
@@ -47,6 +49,8 @@ def list_candidates(
         role_applied=role_applied,
         skill=skill,
         keyword=keyword,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=page,
         page_size=page_size
     )
