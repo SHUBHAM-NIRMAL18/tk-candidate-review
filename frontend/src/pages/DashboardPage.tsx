@@ -12,7 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Archive,
-  ExternalLink
+  ExternalLink,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { fetchCandidates, createCandidate, softDeleteCandidate } from '../api/candidate';
 import type { Candidate, CandidateCreateInput } from '../types/candidate';
@@ -25,6 +28,7 @@ import '../styles/DashboardPage.css';
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.role === 'admin';
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,6 +41,8 @@ export const DashboardPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('');
   const [skillFilter, setSkillFilter] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
+  const [sortBy, setSortBy] = useState<string>('average_score');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [archiveCandidateTarget, setArchiveCandidateTarget] = useState<Candidate | null>(null);
@@ -60,6 +66,8 @@ export const DashboardPage: React.FC = () => {
         role_applied: roleFilter || undefined,
         skill: skillFilter || undefined,
         keyword: keywordInput || undefined,
+        sort_by: sortBy || undefined,
+        sort_order: sortOrder || undefined,
         page,
         page_size: pageSize,
       });
@@ -72,7 +80,41 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, roleFilter, skillFilter, keywordInput, page, pageSize]);
+  }, [statusFilter, roleFilter, skillFilter, keywordInput, sortBy, sortOrder, page, pageSize]);
+
+  const handleSort = (columnKey: string) => {
+    if (sortBy === columnKey) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(columnKey);
+      setSortOrder(columnKey === 'average_score' ? 'desc' : 'asc');
+    }
+    setPage(1);
+  };
+
+  const renderSortHeader = (label: string, columnKey: string) => {
+    const isActive = sortBy === columnKey;
+    return (
+      <th
+        className={`sortable-th ${isActive ? 'active-sort' : ''}`}
+        onClick={() => handleSort(columnKey)}
+        title={`Click to sort by ${label}`}
+      >
+        <div className="sort-header-content">
+          <span>{label}</span>
+          {isActive ? (
+            sortOrder === 'asc' ? (
+              <ArrowUp size={14} className="sort-icon active" />
+            ) : (
+              <ArrowDown size={14} className="sort-icon active" />
+            )
+          ) : (
+            <ArrowUpDown size={14} className="sort-icon default" />
+          )}
+        </div>
+      </th>
+    );
+  };
 
   useEffect(() => {
     loadCandidates();
@@ -293,6 +335,28 @@ export const DashboardPage: React.FC = () => {
                   setPage(1);
                 }}
               />
+
+              <select
+                className="select-filter"
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [field, order] = e.target.value.split('-');
+                  setSortBy(field);
+                  setSortOrder(order as 'asc' | 'desc');
+                  setPage(1);
+                }}
+              >
+                <option value="average_score-desc">Sort: Highest Score</option>
+                <option value="average_score-asc">Sort: Lowest Score</option>
+                <option value="name-asc">Sort: Name (A-Z)</option>
+                <option value="name-desc">Sort: Name (Z-A)</option>
+                <option value="role_applied-asc">Sort: Role (A-Z)</option>
+                <option value="role_applied-desc">Sort: Role (Z-A)</option>
+                <option value="status-asc">Sort: Status (A-Z)</option>
+                <option value="status-desc">Sort: Status (Z-A)</option>
+                <option value="created_at-desc">Sort: Newest First</option>
+                <option value="created_at-asc">Sort: Oldest First</option>
+              </select>
             </div>
           </div>
 
@@ -312,11 +376,11 @@ export const DashboardPage: React.FC = () => {
                 <table className="candidate-table">
                   <thead>
                     <tr>
-                      <th>Candidate Name</th>
-                      <th>Role Applied</th>
-                      <th>Status</th>
+                      {renderSortHeader('Candidate Name', 'name')}
+                      {renderSortHeader('Role Applied', 'role_applied')}
+                      {renderSortHeader('Status', 'status')}
                       <th>Skills</th>
-                      <th>Avg Score</th>
+                      {renderSortHeader('Avg Score', 'average_score')}
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -367,14 +431,16 @@ export const DashboardPage: React.FC = () => {
                               <span>Review</span>
                             </button>
 
-                            <button
-                              onClick={() => setArchiveCandidateTarget(cand)}
-                              className="action-btn archive-icon-btn"
-                              title="Archive Candidate"
-                            >
-                              <Archive size={14} />
-                              <span>Archive</span>
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => setArchiveCandidateTarget(cand)}
+                                className="action-btn archive-icon-btn"
+                                title="Archive Candidate"
+                              >
+                                <Archive size={14} />
+                                <span>Archive</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -435,13 +501,15 @@ export const DashboardPage: React.FC = () => {
                         <span>Review Profile</span>
                       </button>
 
-                      <button
-                        onClick={() => setArchiveCandidateTarget(cand)}
-                        className="action-btn archive-icon-btn"
-                      >
-                        <Archive size={14} />
-                        <span>Archive</span>
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setArchiveCandidateTarget(cand)}
+                          className="action-btn archive-icon-btn"
+                        >
+                          <Archive size={14} />
+                          <span>Archive</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
