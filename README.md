@@ -68,9 +68,9 @@ def search_candidates(status: str, keyword: str, page: int, page_size: int):
 
 **What is wrong:** It pulls the entire `candidates` table into memory on every call, then does the filtering and pagination in Python. That means every request costs the same regardless of how small a page you asked for, memory usage grows with table size instead of staying flat, and none of the indexes on `status` or `role_applied` ever get used because SQLite or Postgres never sees the filter condition.
 
-**Fix:** Push filtering and pagination directly down into SQL:
+**Fix:** Push filtering, dynamic sorting, and pagination directly down into SQL:
 ```python
-def search_candidates(db: Session, status: str = None, keyword: str = None, page: int = 1, page_size: int = 20):
+def search_candidates(db: Session, status: str = None, keyword: str = None, sort_by: str = None, sort_order: str = "desc", page: int = 1, page_size: int = 20):
     query = db.query(Candidate)
     if status:
         query = query.filter(Candidate.status == status)
@@ -78,8 +78,19 @@ def search_candidates(db: Session, status: str = None, keyword: str = None, page
         kw = f"%{keyword}%"
         query = query.filter(Candidate.name.ilike(kw) | Candidate.email.ilike(kw))
 
+    # Dynamic SQL-level sorting (handles average_score via outer join & coalesced score aggregation)
+    if sort_by == "average_score":
+        avg_expr = func.coalesce(func.avg(Score.score), -1)
+        query = query.outerjoin(Score, Candidate.id == Score.candidate_id).group_by(Candidate.id)
+        query = query.order_by(avg_expr.asc() if sort_order == "asc" else avg_expr.desc())
+    elif sort_by in ("name", "role_applied", "status", "created_at"):
+        col = getattr(Candidate, sort_by)
+        query = query.order_by(col.asc() if sort_order == "asc" else col.desc())
+    else:
+        query = query.order_by(Candidate.created_at.desc())
+
     offset = (page - 1) * page_size
-    return query.order_by(Candidate.created_at.desc()).offset(offset).limit(page_size).all()
+    return query.offset(offset).limit(page_size).all()
 ```
 
 ---
@@ -140,9 +151,9 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
   -c cookies.txt
 ```
 
-### 2. List Candidates (filtered + paginated)
+### 2. List Candidates (filtered, sorted + paginated)
 ```bash
-curl -X GET "http://localhost:8000/api/v1/candidates?status=reviewed&page=1&page_size=10" \
+curl -X GET "http://localhost:8000/api/v1/candidates?status=reviewed&sort_by=average_score&sort_order=desc&page=1&page_size=10" \
   -b cookies.txt
 ```
 
@@ -172,5 +183,8 @@ curl -X DELETE http://localhost:8000/api/v1/candidates/CANDIDATE_ID \
 
 - `POST /auth/register` always sets `role="reviewer"` server-side. Any `role` field sent by the client is ignored and never trusted.
 - Reviewers receive `internal_notes: null` in API responses and only ever see their own scores, enforced in the database query layer rather than just the UI.
-- Deleting a candidate sets `status = "archived"`. There is no code path that runs a hard `DELETE FROM candidates`.
+- **Archiving & Soft Delete RBAC**:
+  - **Backend Layer**: Candidate soft delete (`DELETE /api/v1/candidates/{id}`) and profile updates (`PATCH /api/v1/candidates/{id}`) are guarded with `Depends(require_role(["admin"]))`. Any non-admin reviewer attempt returns HTTP `403 Forbidden`.
+  - **Frontend UI Guardrail**: The **Archive Candidate** buttons (desktop table and mobile cards) are conditionally rendered (`isAdmin`) exclusively for admin users, preventing unauthorized reviewer interaction.
+  - **Data Retention**: Deleting a candidate sets `status = "archived"`. There is no code path that executes a hard SQL `DELETE FROM candidates`.
 - `.env` is included in `.gitignore`, and `.env.example` provides placeholder values only.
