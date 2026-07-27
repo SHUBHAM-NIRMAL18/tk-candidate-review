@@ -1,6 +1,6 @@
-# TechKraft Candidate Review Dashboard
+# Candidate Review Dashboard
 
-An internal candidate evaluation tool built with FastAPI, React (Vite), SQLite/SQLAlchemy, and JWT authentication. Built for the TechKraft Full Stack Engineer take-home assignment.
+An internal candidate evaluation tool built with FastAPI, React (Vite), SQLite/SQLAlchemy, and JWT authentication. Built for the Full Stack Engineer take-home assignment.
 
 A quick note on time: the brief gives a 2.5-hour target, but there is no scoring line tied to time itself. I went a bit past it to get RBAC, the SSE stretch goal, and tests done properly rather than submit something half-working. I prioritized correctness over rushing.
 
@@ -43,9 +43,9 @@ The backend seeds a few accounts on first startup (`seed_database()` runs in the
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@techkraft.com | adminpassword |
-| Reviewer 1 | reviewer1@techkraft.com | reviewerpassword |
-| Reviewer 2 | reviewer2@techkraft.com | reviewerpassword |
+| Admin | admin@example.com | adminpassword |
+| Reviewer 1 | reviewer1@example.com | reviewerpassword |
+| Reviewer 2 | reviewer2@example.com | reviewerpassword |
 
 ### Run Tests
 ```bash
@@ -147,7 +147,7 @@ Used Claude to help generate repetitive boilerplate (Pydantic schemas, Dockerfil
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "reviewer1@techkraft.com", "password": "reviewerpassword"}' \
+  -d '{"email": "reviewer1@example.com", "password": "reviewerpassword"}' \
   -c cookies.txt
 ```
 
