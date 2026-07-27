@@ -39,6 +39,8 @@ export interface CandidateFilters {
   role_applied?: string;
   skill?: string;
   keyword?: string;
+  sort_by?: string;
+  sort_order?: string;
   page?: number;
   page_size?: number;
 }
