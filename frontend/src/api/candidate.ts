@@ -15,6 +15,8 @@ export async function fetchCandidates(filters: CandidateFilters = {}): Promise<C
   if (filters.role_applied) params.append('role_applied', filters.role_applied);
   if (filters.skill) params.append('skill', filters.skill);
   if (filters.keyword) params.append('keyword', filters.keyword);
+  if (filters.sort_by) params.append('sort_by', filters.sort_by);
+  if (filters.sort_order) params.append('sort_order', filters.sort_order);
   if (filters.page) params.append('page', filters.page.toString());
   if (filters.page_size) params.append('page_size', filters.page_size.toString());
 
