@@ -48,3 +48,34 @@ def test_candidate_soft_delete_rbac(client, db_session):
 
     db_session.refresh(cand)
     assert cand.status == "archived"
+
+def test_candidate_sorting(client, db_session):
+    from app.models import Score
+    headers = get_auth_headers(client, "sorter@techkraft.com")
+    rev = db_session.query(User).filter(User.email == "sorter@techkraft.com").first()
+
+    c1 = Candidate(name="Alice Alpha", email="alice@test.com", role_applied="Dev")
+    c2 = Candidate(name="Bob Beta", email="bob@test.com", role_applied="Dev")
+    db_session.add_all([c1, c2])
+    db_session.commit()
+
+    # Give Alice a score of 3, Bob a score of 5
+    s1 = Score(candidate_id=c1.id, reviewer_id=rev.id, category="Code Quality", score=3)
+    s2 = Score(candidate_id=c2.id, reviewer_id=rev.id, category="Code Quality", score=5)
+    db_session.add_all([s1, s2])
+    db_session.commit()
+
+    # Sort average score desc -> Bob (5.0) before Alice (3.0)
+    res_desc = client.get("/api/v1/candidates?sort_by=average_score&sort_order=desc", headers=headers)
+    assert res_desc.status_code == 200
+    items = res_desc.json()["items"]
+    assert items[0]["id"] == c2.id
+    assert items[1]["id"] == c1.id
+
+    # Sort average score asc -> Alice (3.0) before Bob (5.0)
+    res_asc = client.get("/api/v1/candidates?sort_by=average_score&sort_order=asc", headers=headers)
+    assert res_asc.status_code == 200
+    items_asc = res_asc.json()["items"]
+    assert items_asc[0]["id"] == c1.id
+    assert items_asc[1]["id"] == c2.id
+
