@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base, SessionLocal
 from app.routers import auth as auth_router
 from app.routers import candidates as candidates_router
+from app.routers import analytics as analytics_router
 from app.seed import seed_database
 
 Base.metadata.create_all(bind=engine)
@@ -38,6 +39,7 @@ app.add_middleware(
 
 app.include_router(auth_router.router)
 app.include_router(candidates_router.router)
+app.include_router(analytics_router.router)
 
 @app.get("/")
 def read_root():
