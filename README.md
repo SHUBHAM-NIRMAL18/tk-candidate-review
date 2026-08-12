@@ -177,6 +177,12 @@ curl -X DELETE http://localhost:8000/api/v1/candidates/CANDIDATE_ID \
   -b cookies.txt
 ```
 
+### 6. Get Hiring & Evaluation Analytics
+```bash
+curl -X GET http://localhost:8000/api/v1/analytics \
+  -b cookies.txt
+```
+
 ---
 
 ## Security Notes

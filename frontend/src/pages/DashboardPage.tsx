@@ -15,7 +15,8 @@ import {
   ExternalLink,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  BarChart3
 } from 'lucide-react';
 import { fetchCandidates, createCandidate, softDeleteCandidate } from '../api/candidate';
 import type { Candidate, CandidateCreateInput } from '../types/candidate';
@@ -207,6 +208,23 @@ export const DashboardPage: React.FC = () => {
         <div className="header-left">
           <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="dashboard-logo" style={{ height: '18px', width: 'auto', display: 'block' }} />
           <span className="app-title">Candidate Review Dashboard</span>
+        </div>
+
+        <div className="nav-tabs">
+          <button
+            className="nav-tab-btn active"
+            onClick={() => {}}
+          >
+            <Users size={15} />
+            <span>Candidates</span>
+          </button>
+          <button
+            className="nav-tab-btn"
+            onClick={() => navigate('/analytics')}
+          >
+            <BarChart3 size={15} />
+            <span>Analytics</span>
+          </button>
         </div>
 
         <div className="header-right">
