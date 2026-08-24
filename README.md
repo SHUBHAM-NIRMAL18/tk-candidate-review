@@ -183,6 +183,37 @@ curl -X GET http://localhost:8000/api/v1/analytics \
   -b cookies.txt
 ```
 
+### 7. Machine-to-Machine Auth via API Key (M2M)
+```bash
+# Query candidates without session cookies using X-API-Key header
+curl -X GET "http://localhost:8000/api/v1/candidates" \
+  -H "X-API-Key: tk_live_YOUR_API_KEY_HERE"
+```
+
+### 8. Export Candidates (CSV & JSON ETL Sync)
+```bash
+# Download CSV spreadsheet
+curl -X GET "http://localhost:8000/api/v1/export/candidates.csv?status=reviewed" \
+  -H "X-API-Key: tk_live_YOUR_API_KEY_HERE" \
+  -o candidates_export.csv
+
+# Fetch full JSON dataset for ETL pipelines
+curl -X GET "http://localhost:8000/api/v1/export/candidates.json" \
+  -H "X-API-Key: tk_live_YOUR_API_KEY_HERE"
+```
+
+### 9. Register Outbound Webhook (Admin)
+```bash
+curl -X POST "http://localhost:8000/api/v1/integrations/webhooks" \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.mycompany.com/webhooks/candidate-events",
+    "events": ["candidate.created", "candidate.status_changed", "score.submitted", "summary.generated"],
+    "description": "Slack Alert & ATS Sync"
+  }'
+```
+
 ---
 
 ## Security Notes
