@@ -18,6 +18,7 @@ from app.schemas.candidate import (
     ScoreRead,
     AISummaryResponse
 )
+from app.services.webhook_service import dispatch_webhook_event
 
 class SSEBroadcaster:
     def __init__(self):
@@ -158,7 +159,7 @@ def get_candidate_detail_service(db: Session, candidate_id: str, current_user: U
 
     return CandidateDetailRead(**cand_dict, scores=score_reads)
 
-def create_candidate_service(db: Session, candidate_in: CandidateCreate, current_user: User) -> CandidateRead:
+async def create_candidate_service(db: Session, candidate_in: CandidateCreate, current_user: User) -> CandidateRead:
     notes = candidate_in.internal_notes if current_user.role == "admin" else None
     candidate = Candidate(
         name=candidate_in.name,
@@ -176,9 +177,19 @@ def create_candidate_service(db: Session, candidate_in: CandidateCreate, current
     if current_user.role != "admin":
         cand_dict["internal_notes"] = None
 
+    # Dispatch outbound webhook
+    await dispatch_webhook_event(db, "candidate.created", {
+        "candidate_id": candidate.id,
+        "name": candidate.name,
+        "email": candidate.email,
+        "role_applied": candidate.role_applied,
+        "status": candidate.status,
+        "skills": candidate.skills
+    })
+
     return CandidateRead(**cand_dict)
 
-def update_candidate_service(
+async def update_candidate_service(
     db: Session, candidate_id: str, candidate_in: CandidateUpdate, current_user: User
 ) -> CandidateRead:
     candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
@@ -194,6 +205,7 @@ def update_candidate_service(
             detail="Only admin users can modify internal notes"
         )
 
+    old_status = candidate.status
     for field, val in candidate_in.model_dump(exclude_unset=True).items():
         setattr(candidate, field, val)
 
@@ -203,9 +215,19 @@ def update_candidate_service(
     cand_dict = CandidateRead.model_validate(candidate).model_dump()
     if current_user.role != "admin":
         cand_dict["internal_notes"] = None
+
+    # Dispatch status changed webhook if status was updated
+    if candidate_in.status is not None and candidate_in.status != old_status:
+        await dispatch_webhook_event(db, "candidate.status_changed", {
+            "candidate_id": candidate.id,
+            "name": candidate.name,
+            "old_status": old_status,
+            "new_status": candidate.status
+        })
+
     return CandidateRead(**cand_dict)
 
-def soft_delete_candidate_service(db: Session, candidate_id: str) -> dict:
+async def soft_delete_candidate_service(db: Session, candidate_id: str) -> dict:
     candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
     if not candidate:
         raise HTTPException(
@@ -213,8 +235,17 @@ def soft_delete_candidate_service(db: Session, candidate_id: str) -> dict:
             detail="Candidate not found"
         )
 
+    old_status = candidate.status
     candidate.status = "archived"
     db.commit()
+
+    await dispatch_webhook_event(db, "candidate.status_changed", {
+        "candidate_id": candidate.id,
+        "name": candidate.name,
+        "old_status": old_status,
+        "new_status": "archived"
+    })
+
     return {"message": f"Candidate {candidate_id} soft deleted (status set to archived)"}
 
 async def create_score_service(
@@ -254,8 +285,21 @@ async def create_score_service(
     score_dict["reviewer_email"] = current_user.email
     score_read = ScoreRead(**score_dict)
 
+    # Broadcast SSE stream
     sse_data = f"data: {score_read.model_dump_json()}\n\n"
     await broadcaster.broadcast(candidate_id, sse_data)
+
+    # Dispatch outbound webhook
+    await dispatch_webhook_event(db, "score.submitted", {
+        "candidate_id": candidate_id,
+        "candidate_name": candidate.name,
+        "score_id": score_read.id,
+        "reviewer_id": current_user.id,
+        "reviewer_email": current_user.email,
+        "category": score_in.category,
+        "score": score_in.score,
+        "note": score_in.note
+    })
 
     return score_read
 
@@ -288,5 +332,12 @@ async def generate_ai_summary_service(db: Session, candidate_id: str) -> AISumma
 
     candidate.ai_summary = summary_text
     db.commit()
+
+    # Dispatch webhook event
+    await dispatch_webhook_event(db, "summary.generated", {
+        "candidate_id": candidate_id,
+        "candidate_name": candidate.name,
+        "summary": summary_text
+    })
 
     return AISummaryResponse(candidate_id=candidate_id, summary=summary_text)
