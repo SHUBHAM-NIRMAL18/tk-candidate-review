@@ -16,12 +16,14 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  BarChart3
+  BarChart3,
+  KeyRound,
 } from 'lucide-react';
 import { fetchCandidates, createCandidate, softDeleteCandidate } from '../api/candidate';
 import type { Candidate, CandidateCreateInput } from '../types/candidate';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AddCandidateModal } from '../components/AddCandidateModal';
+import { IntegrationsModal } from '../components/IntegrationsModal';
 import { Toast } from '../components/Toast';
 import { consumeToast, type ToastData } from '../utils/toast';
 import '../styles/DashboardPage.css';
@@ -46,6 +48,7 @@ export const DashboardPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
   const [archiveCandidateTarget, setArchiveCandidateTarget] = useState<Candidate | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -204,6 +207,11 @@ export const DashboardPage: React.FC = () => {
         userRole={user?.role}
       />
 
+      <IntegrationsModal
+        isOpen={showIntegrationsModal}
+        onClose={() => setShowIntegrationsModal(false)}
+      />
+
       <header className="dashboard-header">
         <div className="header-left">
           <img src="/TechKraft-Logo.svg" alt="TechKraft Logo" className="dashboard-logo" style={{ height: '18px', width: 'auto', display: 'block' }} />
@@ -256,10 +264,23 @@ export const DashboardPage: React.FC = () => {
             </p>
           </div>
 
-          <button onClick={() => setShowAddModal(true)} className="btn-add-candidate">
-            <Plus size={18} />
-            <span>Add Candidate</span>
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isAdmin && (
+              <button
+                onClick={() => setShowIntegrationsModal(true)}
+                className="btn-add-candidate"
+                style={{ background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1' }}
+                title="Manage API Keys & Webhooks"
+              >
+                <KeyRound size={18} style={{ color: '#4f46e5' }} />
+                <span>Integrations & API</span>
+              </button>
+            )}
+            <button onClick={() => setShowAddModal(true)} className="btn-add-candidate">
+              <Plus size={18} />
+              <span>Add Candidate</span>
+            </button>
+          </div>
         </div>
 
         <div className="stats-grid">
