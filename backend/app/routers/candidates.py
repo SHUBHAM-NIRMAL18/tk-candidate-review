@@ -56,12 +56,12 @@ def list_candidates(
     )
 
 @router.post("", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)
-def create_candidate(
+async def create_candidate(
     candidate_in: CandidateCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return create_candidate_service(db=db, candidate_in=candidate_in, current_user=current_user)
+    return await create_candidate_service(db=db, candidate_in=candidate_in, current_user=current_user)
 
 @router.get("/{candidate_id}", response_model=CandidateDetailRead)
 def get_candidate(
@@ -73,13 +73,13 @@ def get_candidate(
 
 # Admin-only: only admins can modify candidate profiles (name, status, notes, etc.)
 @router.patch("/{candidate_id}", response_model=CandidateRead)
-def update_candidate(
+async def update_candidate(
     candidate_id: str,
     candidate_in: CandidateUpdate,
     current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db)
 ):
-    return update_candidate_service(
+    return await update_candidate_service(
         db=db,
         candidate_id=candidate_id,
         candidate_in=candidate_in,
@@ -88,12 +88,12 @@ def update_candidate(
 
 # Admin-only: soft delete sets status='archived', never hard-deletes
 @router.delete("/{candidate_id}")
-def delete_candidate(
+async def delete_candidate(
     candidate_id: str,
     current_user: User = Depends(require_role(["admin"])),
     db: Session = Depends(get_db)
 ):
-    return soft_delete_candidate_service(db=db, candidate_id=candidate_id)
+    return await soft_delete_candidate_service(db=db, candidate_id=candidate_id)
 
 @router.post("/{candidate_id}/scores", response_model=ScoreRead, status_code=status.HTTP_201_CREATED)
 async def submit_candidate_score(
@@ -136,4 +136,3 @@ async def stream_candidate_scores(
             broadcaster.unsubscribe(candidate_id, queue)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
