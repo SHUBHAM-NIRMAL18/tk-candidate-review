@@ -2,8 +2,10 @@ import os
 import uuid
 import logging
 import bcrypt
+import secrets
+import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -12,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.blacklisted_token import BlacklistedToken
+from app.models.api_key import APIKey
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def generate_api_key_pair() -> tuple[str, str, str]:
+    """Generates (raw_key, prefix, key_hash) for M2M auth."""
+    raw_token = secrets.token_hex(24)
+    raw_key = f"tk_live_{raw_token}"
+    prefix = f"tk_live_{raw_token[:6]}..."
+    key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+    return raw_key, prefix, key_hash
+
 def get_current_user(
     request: Request,
     bearer_token: Optional[str] = Depends(oauth2_scheme),
@@ -57,7 +68,56 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Priority: HttpOnly Cookie > Bearer Header
+    # 1. Check for API Key in headers (X-API-Key or Authorization: Api-Key <token>)
+    api_key_header = request.headers.get("X-API-Key")
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("api-key "):
+        api_key_header = auth_header.split(" ", 1)[1].strip()
+
+    if api_key_header:
+        key_hash = hashlib.sha256(api_key_header.encode("utf-8")).hexdigest()
+        api_key_record = db.query(APIKey).filter(
+            APIKey.key_hash == key_hash,
+            APIKey.is_active.is_(True)
+        ).first()
+
+        if not api_key_record:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked API Key",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+
+        # Check expiration if set
+        if api_key_record.expires_at:
+            exp = api_key_record.expires_at
+            is_expired = exp < datetime.now(timezone.utc) if exp.tzinfo is not None else exp < datetime.now(timezone.utc).replace(tzinfo=None)
+            if is_expired:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API Key has expired",
+                    headers={"WWW-Authenticate": "ApiKey"},
+                )
+
+        # Update last_used_at timestamp
+        api_key_record.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # If key is associated with a real user, return that user; otherwise return synthetic service user
+        if api_key_record.created_by_id:
+            user = db.query(User).filter(User.id == api_key_record.created_by_id).first()
+            if user:
+                return user
+
+        scopes_list = [s.strip() for s in api_key_record.scopes.split(",") if s.strip()]
+        is_admin_scope = "admin:all" in scopes_list or "admin" in scopes_list
+        return User(
+            id=f"apikey_{api_key_record.id}",
+            email=f"{api_key_record.name.lower().replace(' ', '_')}@api.service",
+            role="admin" if is_admin_scope else "reviewer"
+        )
+
+    # 2. Priority: HttpOnly Cookie > Bearer Header
     token = request.cookies.get("access_token") or bearer_token
     if not token:
         raise credentials_exception
@@ -90,4 +150,3 @@ def require_role(allowed_roles: list[str]):
             )
         return current_user
     return role_checker
-
