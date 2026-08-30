@@ -34,9 +34,12 @@ A quick note on time: the brief gives a 2.5-hour target, but there is no scoring
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Frontend | http://localhost:5173 | Candidate dashboard |
+| Frontend | http://localhost:5173 | Candidate review web UI |
 | Backend API | http://localhost:8000 | FastAPI REST service |
-| Swagger docs | http://localhost:8000/docs | OpenAPI UI |
+| Swagger docs | http://localhost:8000/docs | Interactive OpenAPI documentation |
+| Prometheus | http://localhost:9090 | Prometheus metrics server & query engine |
+| Grafana Dashboard | http://localhost:3000 | Pre-provisioned Candidate Review Observability dashboard (`admin`/`admin`) |
+| Metrics Endpoint | http://localhost:8000/metrics | Prometheus raw metrics exposition |
 
 ### Seeded Accounts
 The backend seeds a few accounts on first startup (`seed_database()` runs in the FastAPI lifespan hook if tables are empty):
@@ -225,3 +228,35 @@ curl -X POST "http://localhost:8000/api/v1/integrations/webhooks" \
   - **Frontend UI Guardrail**: The **Archive Candidate** buttons (desktop table and mobile cards) are conditionally rendered (`isAdmin`) exclusively for admin users, preventing unauthorized reviewer interaction.
   - **Data Retention**: Deleting a candidate sets `status = "archived"`. There is no code path that executes a hard SQL `DELETE FROM candidates`.
 - `.env` is included in `.gitignore`, and `.env.example` provides placeholder values only.
+
+---
+
+## Monitoring & Observability (Prometheus + Grafana)
+
+The stack comes fully instrumented with **Prometheus** metrics collection and **Grafana** visualization pre-configured with zero manual setup required.
+
+### 1. Key Observability Features
+- **Auto-Provisioned Grafana**: Grafana launches with the Prometheus data source already wired and a rich dashboard automatically mounted (`TechKraft Candidate Review - Observability Dashboard`).
+- **Real-Time API Telemetry**: Request throughput (RPS), p50/p90/p99 latency percentiles, error rates (5xx/4xx), concurrent in-flight requests, and HTTP status code distribution.
+- **Custom Business & Application Metrics**:
+  - `candidate_status_updates_total`: Tracks candidate workflow transitions (`shortlisted`, `reviewed`, `archived`, etc.).
+  - `candidate_scores_total`: Tracks evaluation scores submitted per review category.
+  - `webhook_dispatches_total`: Tracks webhook delivery successes and failures by event type.
+  - `export_requests_total`: Tracks data export operations (CSV vs JSON ETL).
+  - `active_sse_connections`: Tracks live real-time score SSE streaming clients.
+
+### 2. Accessing Dashboards & Metrics
+- **Grafana Dashboard**: Open `http://localhost:3000` (Default credentials: `admin` / `admin` with anonymous view access enabled).
+- **Prometheus Targets & Queries**: Open `http://localhost:9090/targets` to verify backend scrape health, or execute custom PromQL queries:
+  ```promql
+  # Average API latency (ms) over 1m window
+  sum(rate(http_request_duration_seconds_sum[1m])) / sum(rate(http_request_duration_seconds_count[1m])) * 1000
+
+  # Requests per second by route and HTTP method
+  sum by (handler, method) (rate(http_request_duration_seconds_count[1m]))
+
+  # Webhook delivery failure rate
+  sum(rate(webhook_dispatches_total{status="failed"}[5m]))
+  ```
+- **Raw Metrics**: Check the live Prometheus exposition format at `http://localhost:8000/metrics`.
+
