@@ -10,6 +10,7 @@ from app.routers import analytics as analytics_router
 from app.routers import integrations as integrations_router
 from app.routers import export as export_router
 from app.seed import seed_database
+from app.metrics import setup_metrics
 
 Base.metadata.create_all(bind=engine)
 
@@ -45,6 +46,10 @@ app.include_router(analytics_router.router)
 app.include_router(integrations_router.router)
 app.include_router(export_router.router)
 
+# Initialize Prometheus instrumentation & /metrics route
+setup_metrics(app)
+
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "TechKraft Candidate Review API is running"}
+

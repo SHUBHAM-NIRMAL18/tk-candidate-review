@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.webhook import Webhook, WebhookDelivery
+from app.metrics import WEBHOOK_DISPATCHES_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ async def _deliver_to_webhook(
         success = False
 
     duration_ms = int((time.time() - start_time) * 1000)
+
+    # Track metric
+    status_label = "success" if success else "failed"
+    WEBHOOK_DISPATCHES_TOTAL.labels(event_name=event_name, status=status_label).inc()
 
     # Record delivery log in a separate DB session
     db = SessionLocal()

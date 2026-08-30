@@ -19,6 +19,11 @@ from app.schemas.candidate import (
     AISummaryResponse
 )
 from app.services.webhook_service import dispatch_webhook_event
+from app.metrics import (
+    CANDIDATE_STATUS_UPDATES_TOTAL,
+    CANDIDATE_SCORES_TOTAL,
+    ACTIVE_SSE_CONNECTIONS,
+)
 
 class SSEBroadcaster:
     def __init__(self):
@@ -29,11 +34,13 @@ class SSEBroadcaster:
             self._listeners[candidate_id] = set()
         queue: asyncio.Queue = asyncio.Queue()
         self._listeners[candidate_id].add(queue)
+        ACTIVE_SSE_CONNECTIONS.inc()
         return queue
 
     def unsubscribe(self, candidate_id: str, queue: asyncio.Queue):
         if candidate_id in self._listeners:
             self._listeners[candidate_id].discard(queue)
+            ACTIVE_SSE_CONNECTIONS.dec()
             if not self._listeners[candidate_id]:
                 del self._listeners[candidate_id]
 
@@ -187,6 +194,9 @@ async def create_candidate_service(db: Session, candidate_in: CandidateCreate, c
         "skills": candidate.skills
     })
 
+    # Track metric
+    CANDIDATE_STATUS_UPDATES_TOTAL.labels(status=candidate.status).inc()
+
     return CandidateRead(**cand_dict)
 
 async def update_candidate_service(
@@ -224,6 +234,7 @@ async def update_candidate_service(
             "old_status": old_status,
             "new_status": candidate.status
         })
+        CANDIDATE_STATUS_UPDATES_TOTAL.labels(status=candidate.status).inc()
 
     return CandidateRead(**cand_dict)
 
@@ -245,6 +256,7 @@ async def soft_delete_candidate_service(db: Session, candidate_id: str) -> dict:
         "old_status": old_status,
         "new_status": "archived"
     })
+    CANDIDATE_STATUS_UPDATES_TOTAL.labels(status="archived").inc()
 
     return {"message": f"Candidate {candidate_id} soft deleted (status set to archived)"}
 
@@ -300,6 +312,9 @@ async def create_score_service(
         "score": score_in.score,
         "note": score_in.note
     })
+
+    # Track metric
+    CANDIDATE_SCORES_TOTAL.labels(category=score_in.category).inc()
 
     return score_read
 

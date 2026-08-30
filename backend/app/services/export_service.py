@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.candidate import Candidate
 from app.models.score import Score
 from app.models.user import User
+from app.metrics import EXPORT_REQUESTS_TOTAL
 
 def generate_candidates_csv(
     db: Session,
@@ -12,6 +13,7 @@ def generate_candidates_csv(
     status_filter: Optional[str] = None
 ) -> str:
     """Generates a CSV string of candidates, their aggregated scores, and review statuses."""
+    EXPORT_REQUESTS_TOTAL.labels(format="csv").inc()
     query = db.query(Candidate)
     if status_filter:
         query = query.filter(Candidate.status == status_filter)
@@ -74,6 +76,7 @@ def generate_candidates_json(
     status_filter: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Generates a structured list of candidates and nested evaluation scores for external ETL pipelines."""
+    EXPORT_REQUESTS_TOTAL.labels(format="json").inc()
     query = db.query(Candidate)
     if status_filter:
         query = query.filter(Candidate.status == status_filter)
