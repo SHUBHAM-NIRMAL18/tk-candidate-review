@@ -1,5 +1,6 @@
 import asyncio
 import math
+import time
 from typing import Dict, List, Optional, Set
 from fastapi import HTTPException, status
 from sqlalchemy import or_, func
@@ -23,6 +24,7 @@ from app.metrics import (
     CANDIDATE_STATUS_UPDATES_TOTAL,
     CANDIDATE_SCORES_TOTAL,
     ACTIVE_SSE_CONNECTIONS,
+    DB_QUERY_DURATION_SECONDS,
 )
 
 class SSEBroadcaster:
@@ -66,6 +68,7 @@ def list_candidates_service(
     page_size = max(1, min(page_size, 50))
     page = max(1, page)
 
+    _db_start = time.time()
     query = db.query(Candidate)
 
     if status_filter:
@@ -110,6 +113,7 @@ def list_candidates_service(
         query = query.order_by(Candidate.created_at.desc())
 
     candidates = query.offset(offset).limit(page_size).all()
+    DB_QUERY_DURATION_SECONDS.labels(operation="list_candidates").observe(max(time.time() - _db_start, 0.0))
 
     items = []
     for c in candidates:
@@ -135,6 +139,7 @@ def list_candidates_service(
     )
 
 def get_candidate_detail_service(db: Session, candidate_id: str, current_user: User) -> CandidateDetailRead:
+    _db_start = time.time()
     candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
     if not candidate:
         raise HTTPException(
@@ -158,6 +163,7 @@ def get_candidate_detail_service(db: Session, candidate_id: str, current_user: U
         cand_dict["internal_notes"] = None
 
     all_scores = db.query(Score.score).filter(Score.candidate_id == candidate_id).all()
+    DB_QUERY_DURATION_SECONDS.labels(operation="get_candidate_detail").observe(max(time.time() - _db_start, 0.0))
     if all_scores:
         avg = sum(s[0] for s in all_scores) / len(all_scores)
         cand_dict["average_score"] = round(avg, 1)
@@ -176,9 +182,11 @@ async def create_candidate_service(db: Session, candidate_in: CandidateCreate, c
         skills=candidate_in.skills,
         internal_notes=notes
     )
+    _db_start = time.time()
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
+    DB_QUERY_DURATION_SECONDS.labels(operation="create_candidate").observe(max(time.time() - _db_start, 0.0))
 
     cand_dict = CandidateRead.model_validate(candidate).model_dump()
     if current_user.role != "admin":
@@ -290,8 +298,10 @@ async def create_score_service(
         )
         db.add(score_obj)
 
+    _db_start = time.time()
     db.commit()
     db.refresh(score_obj)
+    DB_QUERY_DURATION_SECONDS.labels(operation="create_score").observe(max(time.time() - _db_start, 0.0))
 
     score_dict = ScoreRead.model_validate(score_obj).model_dump()
     score_dict["reviewer_email"] = current_user.email
