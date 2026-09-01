@@ -1,0 +1,87 @@
+groups:
+  - name: candidate_review_recording_rules
+    interval: 15s
+    rules:
+      # ── Pre-aggregated Request Rate ────────────────────────────────────
+      # Avoids recomputing rate() on high-cardinality raw metrics in every
+      # dashboard panel and alert rule. Standard Prometheus best practice.
+      - record: job:http_requests:rate1m
+        expr: sum by (job) (rate(http_request_duration_seconds_count[1m]))
+
+      - record: job:http_requests_by_status:rate1m
+        expr: sum by (job, status) (rate(http_request_duration_seconds_count[1m]))
+
+      - record: job:http_requests_by_handler:rate1m
+        expr: sum by (job, handler, method) (rate(http_request_duration_seconds_count[1m]))
+
+      # ── Pre-aggregated Error Rate ──────────────────────────────────────
+      - record: job:http_request_errors:rate1m
+        expr: sum by (job) (rate(http_request_duration_seconds_count{status=~"5.."}[1m]))
+
+      - record: job:http_request_client_errors:rate1m
+        expr: sum by (job) (rate(http_request_duration_seconds_count{status=~"4.."}[1m]))
+
+      # ── Pre-computed Latency Percentiles ───────────────────────────────
+      # Computing histogram_quantile on high-cardinality bucket data is
+      # expensive. Recording rules pre-compute these for dashboard queries.
+      - record: job:http_request_duration_seconds:p50_1m
+        expr: >
+          histogram_quantile(0.50,
+            sum by (job, le) (rate(http_request_duration_seconds_bucket[1m]))
+          )
+
+      - record: job:http_request_duration_seconds:p90_1m
+        expr: >
+          histogram_quantile(0.90,
+            sum by (job, le) (rate(http_request_duration_seconds_bucket[1m]))
+          )
+
+      - record: job:http_request_duration_seconds:p99_1m
+        expr: >
+          histogram_quantile(0.99,
+            sum by (job, le) (rate(http_request_duration_seconds_bucket[1m]))
+          )
+
+      # ── SLO Availability Ratio ─────────────────────────────────────────
+      # Computes the real-time success ratio (1 - error_rate).
+      # Used by SLO dashboard panels and error budget alerts.
+      # Target SLO: 99.9% availability (0.1% error budget over 30 days).
+      - record: job:slo_availability:ratio1m
+        expr: >
+          1 - (
+            sum by (job) (rate(http_request_duration_seconds_count{status=~"5.."}[1m]))
+            /
+            sum by (job) (rate(http_request_duration_seconds_count[1m]))
+          )
+
+      # ── SLO Error Budget Remaining ─────────────────────────────────────
+      # Shows what fraction of the 30-day error budget has been consumed.
+      # Error budget = 1 - SLO target = 0.001 (for 99.9%)
+      # Consumed = 1 - (current_availability / target_availability)
+      - record: job:slo_error_budget_remaining:ratio1m
+        expr: >
+          1 - (
+            (1 - job:slo_availability:ratio1m)
+            /
+            0.001
+          )
+
+      # ── Pre-aggregated Database Latency ────────────────────────────────
+      - record: job:db_query_duration_seconds:p95_1m
+        expr: >
+          histogram_quantile(0.95,
+            sum by (le) (rate(db_query_duration_seconds_bucket[1m]))
+          )
+
+      - record: job:db_query_duration_seconds:p50_1m
+        expr: >
+          histogram_quantile(0.50,
+            sum by (le) (rate(db_query_duration_seconds_bucket[1m]))
+          )
+
+      # ── Pre-aggregated Auth Metrics ────────────────────────────────────
+      - record: job:auth_login_success:rate5m
+        expr: sum by (job) (rate(auth_login_attempts_total{result="success"}[5m]))
+
+      - record: job:auth_login_failure:rate5m
+        expr: sum by (job) (rate(auth_login_attempts_total{result="failure"}[5m]))
