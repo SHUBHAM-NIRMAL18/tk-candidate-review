@@ -12,6 +12,7 @@ from app.auth import (
     hash_password, verify_password, create_access_token,
     get_current_user, SECRET_KEY, ALGORITHM
 )
+from app.metrics import AUTH_LOGIN_ATTEMPTS_TOTAL, AUTH_ACTIVE_SESSIONS
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -57,11 +58,14 @@ def register_user(user_in: UserRegister, response: Response, db: Session = Depen
 def login_user(user_in: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_in.email).first()
     if not user or not verify_password(user_in.password, user.hashed_password):
+        AUTH_LOGIN_ATTEMPTS_TOTAL.labels(result="failure").inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
+    AUTH_LOGIN_ATTEMPTS_TOTAL.labels(result="success").inc()
+    AUTH_ACTIVE_SESSIONS.inc()
     access_token = create_access_token(data={"sub": user.id, "role": user.role})
     set_auth_cookie(response, access_token)
     return Token(access_token=access_token, token_type="bearer", user=UserRead.model_validate(user))
@@ -83,6 +87,7 @@ def logout_user(request: Request, response: Response, db: Session = Depends(get_
         except JWTError:
             pass  # Token already invalid, just clear the cookie
 
+    AUTH_ACTIVE_SESSIONS.dec()
     response.delete_cookie(key="access_token", path="/")
     return {"message": "Logged out successfully"}
 
