@@ -1,0 +1,91 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: 'Candidate Review SLO Alerts'
+    folder: 'Candidate Review'
+    interval: 1m
+    rules:
+      - uid: 'slo-availability-breach'
+        title: 'SLO Availability Below 99.9%'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 'job:slo_availability:ratio1m{job="candidate-review-backend"}'
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.999]
+                  operator:
+                    type: and
+                  reducer:
+                    type: last
+              refId: C
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: 'SLO availability has dropped below the 99.9% target'
+          description: >-
+            The service availability ratio (1 - error_rate) has been below
+            the 99.9% SLO target for 5 minutes. This is consuming error budget
+            and may breach the monthly SLO commitment.
+        noDataState: OK
+        execErrState: Alerting
+
+      - uid: 'backend-high-latency'
+        title: 'Backend p99 Latency > 1s'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: Prometheus
+            model:
+              expr: 'job:http_request_duration_seconds:p99_1m{job="candidate-review-backend"}'
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1.0]
+                  operator:
+                    type: and
+                  reducer:
+                    type: last
+              refId: C
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: 'Backend p99 response latency exceeds 1 second'
+          description: >-
+            The pre-computed p99 latency recording rule shows sustained
+            tail latency above 1 second. This typically indicates slow
+            database queries or resource contention.
+        noDataState: OK
+        execErrState: Alerting
