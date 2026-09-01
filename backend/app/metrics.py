@@ -1,3 +1,4 @@
+import sys
 import time
 from typing import Callable
 from fastapi import FastAPI, Request, Response
@@ -5,6 +6,7 @@ from prometheus_client import (
     Counter,
     Histogram,
     Gauge,
+    Info,
     generate_latest,
     CONTENT_TYPE_LATEST,
     REGISTRY,
@@ -12,7 +14,21 @@ from prometheus_client import (
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Match
 
-# Standard HTTP Request Metrics
+# ── Application Info Gauge ───────────────────────────────────────────────
+# Exposes service metadata as labels. Standard practice for service discovery
+# and version-aware dashboards (e.g. canary vs stable rollout tracking).
+APP_INFO = Info(
+    "app",
+    "Application metadata for service discovery and version tracking",
+)
+APP_INFO.info({
+    "name": "tk-candidate-review",
+    "version": "1.0.0",
+    "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+    "framework": "fastapi",
+})
+
+# ── Standard HTTP Request Metrics ────────────────────────────────────────
 HTTP_REQUESTS_TOTAL = Counter(
     "http_requests_total",
     "Total count of HTTP requests processed by status, method, and path",
@@ -32,7 +48,48 @@ FASTAPI_INPROGRESS_REQUESTS = Gauge(
     ["method", "handler"],
 )
 
-# Custom Business & Application Metrics
+# ── Request & Response Size Metrics ──────────────────────────────────────
+# Tracks payload sizes to detect oversized requests (potential abuse),
+# response bloat, and verify pagination is working as expected.
+HTTP_REQUEST_SIZE_BYTES = Histogram(
+    "http_request_size_bytes",
+    "HTTP request body size in bytes",
+    ["method", "handler"],
+    buckets=[64, 256, 1024, 4096, 16384, 65536, 262144, 1048576],
+)
+
+HTTP_RESPONSE_SIZE_BYTES = Histogram(
+    "http_response_size_bytes",
+    "HTTP response body size in bytes",
+    ["method", "handler"],
+    buckets=[64, 256, 1024, 4096, 16384, 65536, 262144, 1048576],
+)
+
+# ── Database Query Metrics ───────────────────────────────────────────────
+# Tracks query latency — the #1 bottleneck in CRUD applications.
+# Enables alerting on slow queries and trending DB performance over time.
+DB_QUERY_DURATION_SECONDS = Histogram(
+    "db_query_duration_seconds",
+    "Database query execution duration in seconds",
+    ["operation"],  # e.g. list_candidates, get_candidate, create_score
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
+)
+
+# ── Authentication & Security Metrics ────────────────────────────────────
+# Tracks login attempts by result — enables brute-force detection alerts
+# and login success/failure ratio dashboards.
+AUTH_LOGIN_ATTEMPTS_TOTAL = Counter(
+    "auth_login_attempts_total",
+    "Total login attempts by result (success or failure)",
+    ["result"],  # success, failure
+)
+
+AUTH_ACTIVE_SESSIONS = Gauge(
+    "auth_active_sessions",
+    "Approximate number of currently active authenticated sessions",
+)
+
+# ── Custom Business & Application Metrics ────────────────────────────────
 CANDIDATE_STATUS_UPDATES_TOTAL = Counter(
     "candidate_status_updates_total",
     "Total number of candidate status changes",
@@ -80,6 +137,16 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         method = request.method
         route_path = get_route_path(request)
 
+        # Track request body size
+        request_size = 0
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                request_size = int(content_length)
+            except (ValueError, TypeError):
+                pass
+        HTTP_REQUEST_SIZE_BYTES.labels(method=method, handler=route_path).observe(request_size)
+
         FASTAPI_INPROGRESS_REQUESTS.labels(method=method, handler=route_path).inc()
         start_time = time.time()
         status_code = 500
@@ -87,6 +154,17 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
+
+            # Track response body size
+            response_size = 0
+            response_content_length = response.headers.get("content-length")
+            if response_content_length:
+                try:
+                    response_size = int(response_content_length)
+                except (ValueError, TypeError):
+                    pass
+            HTTP_RESPONSE_SIZE_BYTES.labels(method=method, handler=route_path).observe(response_size)
+
             return response
         except Exception:
             raise
