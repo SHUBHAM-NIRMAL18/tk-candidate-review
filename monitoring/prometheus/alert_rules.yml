@@ -1,0 +1,171 @@
+groups:
+  - name: candidate_review_alerts
+    rules:
+      # ── Critical: Backend Target Down ──────────────────────────────────
+      - alert: BackendDown
+        expr: up{job="candidate-review-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: candidate-review-backend
+        annotations:
+          summary: "Backend service is DOWN"
+          description: >-
+            The candidate-review-backend scrape target has been unreachable
+            for more than 30 seconds. Prometheus cannot collect metrics.
+            Current value: {{ $value }}
+
+      # ── Critical: High 5xx Error Rate ──────────────────────────────────
+      - alert: HighErrorRate
+        expr: >
+          (
+            sum(rate(http_request_duration_seconds_count{status=~"5.."}[2m]))
+            /
+            sum(rate(http_request_duration_seconds_count[2m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: candidate-review-backend
+        annotations:
+          summary: "High 5xx error rate detected ({{ $value | printf \"%.1f\" }}%)"
+          description: >-
+            More than 5% of HTTP requests are returning 5xx status codes
+            over the last 2 minutes. This indicates a server-side failure
+            impacting users. Current error rate: {{ $value | printf "%.2f" }}%.
+
+      # ── Warning: Elevated 4xx Client Error Rate ────────────────────────
+      - alert: ElevatedClientErrorRate
+        expr: >
+          (
+            sum(rate(http_request_duration_seconds_count{status=~"4.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) * 100 > 25
+        for: 5m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "Elevated 4xx client error rate ({{ $value | printf \"%.1f\" }}%)"
+          description: >-
+            More than 25% of requests are returning 4xx errors. This may indicate
+            a broken client integration, authentication issues, or API misuse.
+
+      # ── Warning: High p99 Latency ──────────────────────────────────────
+      - alert: HighLatencyP99
+        expr: >
+          histogram_quantile(0.99,
+            sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "p99 latency exceeds 1 second ({{ $value | printf \"%.2f\" }}s)"
+          description: >-
+            The 99th percentile response latency has exceeded 1 second for
+            the past 5 minutes. Tail latency this high typically means a
+            subset of requests are hitting slow database queries or contention.
+
+      # ── Critical: p99 Latency Sustained ────────────────────────────────
+      - alert: CriticalLatencyP99
+        expr: >
+          histogram_quantile(0.99,
+            sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2.5
+        for: 5m
+        labels:
+          severity: critical
+          service: candidate-review-backend
+        annotations:
+          summary: "CRITICAL: p99 latency exceeds 2.5 seconds"
+          description: >-
+            The 99th percentile response latency has exceeded 2.5 seconds for
+            5 minutes. This is a severe performance degradation impacting user
+            experience. Immediate investigation required.
+
+      # ── Warning: High In-Flight Requests ───────────────────────────────
+      - alert: HighInFlightRequests
+        expr: sum(fastapi_inprogress_requests) > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "High concurrent in-flight requests ({{ $value }})"
+          description: >-
+            The number of concurrent HTTP requests being processed has exceeded
+            50 for over 2 minutes. This may indicate resource exhaustion,
+            upstream slowness, or a traffic spike that exceeds capacity.
+
+      # ── Warning: Webhook Delivery Failures ─────────────────────────────
+      - alert: WebhookDeliveryFailures
+        expr: >
+          sum(rate(webhook_dispatches_total{status="failed"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "Webhook delivery failures detected"
+          description: >-
+            Outbound webhook deliveries are failing at a sustained rate.
+            This may indicate the downstream webhook endpoint is unreachable
+            or returning errors. Check webhook_deliveries table for details.
+
+      # ── Warning: Database Query Latency ────────────────────────────────
+      - alert: HighDatabaseLatency
+        expr: >
+          histogram_quantile(0.95,
+            sum by (le) (rate(db_query_duration_seconds_bucket[5m]))
+          ) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "Database p95 query latency exceeds 500ms"
+          description: >-
+            The 95th percentile database query latency has exceeded 500ms for
+            3 minutes. This may indicate table lock contention, missing indexes,
+            or dataset growth beyond SQLite's comfortable operating range.
+
+      # ── Warning: Login Brute-Force Detection ───────────────────────────
+      - alert: HighLoginFailureRate
+        expr: >
+          (
+            sum(rate(auth_login_attempts_total{result="failure"}[5m]))
+            /
+            sum(rate(auth_login_attempts_total[5m]))
+          ) * 100 > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: candidate-review-backend
+        annotations:
+          summary: "High login failure rate detected ({{ $value | printf \"%.1f\" }}%)"
+          description: >-
+            More than 50% of login attempts are failing. This may indicate
+            a brute-force attack or a widespread credential issue.
+
+      # ── Warning: SLO Error Budget Burn Rate ────────────────────────────
+      - alert: SLOErrorBudgetBurnRateHigh
+        expr: >
+          (
+            sum(rate(http_request_duration_seconds_count{status=~"5.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) > (1 - 0.999) * 14.4
+        for: 5m
+        labels:
+          severity: critical
+          service: candidate-review-backend
+        annotations:
+          summary: "SLO error budget burning too fast (14.4x burn rate)"
+          description: >-
+            The current error rate is consuming the 30-day error budget at
+            14.4x the sustainable rate. At this pace, the entire monthly
+            error budget will be exhausted within ~2 days. This is a
+            multi-burn-rate SLO alert following Google SRE best practices.
