@@ -38,6 +38,7 @@ A quick note on time: the brief gives a 2.5-hour target, but there is no scoring
 | Backend API | http://localhost:8000 | FastAPI REST service |
 | Swagger docs | http://localhost:8000/docs | Interactive OpenAPI documentation |
 | Prometheus | http://localhost:9090 | Prometheus metrics server & query engine |
+| Alertmanager | http://localhost:9093 | Alert routing, silencing & severity-based notification |
 | Grafana Dashboard | http://localhost:3000 | Pre-provisioned Candidate Review Observability dashboard (`admin`/`admin`) |
 | Metrics Endpoint | http://localhost:8000/metrics | Prometheus raw metrics exposition |
 
@@ -231,32 +232,177 @@ curl -X POST "http://localhost:8000/api/v1/integrations/webhooks" \
 
 ---
 
-## Monitoring & Observability (Prometheus + Grafana)
+## Monitoring & Observability (Prometheus + Grafana + Alertmanager)
 
-The stack comes fully instrumented with **Prometheus** metrics collection and **Grafana** visualization pre-configured with zero manual setup required.
+The stack comes fully instrumented with a production-grade observability pipeline — **Prometheus** metrics collection, **Alertmanager** severity-based alert routing, and **Grafana** visualization with **zero manual setup** required. Everything is infrastructure-as-code: dashboards, data sources, alert rules, and recording rules are auto-provisioned on `docker compose up`.
 
-### 1. Key Observability Features
-- **Auto-Provisioned Grafana**: Grafana launches with the Prometheus data source already wired and a rich dashboard automatically mounted (`TechKraft Candidate Review - Observability Dashboard`).
-- **Real-Time API Telemetry**: Request throughput (RPS), p50/p90/p99 latency percentiles, error rates (5xx/4xx), concurrent in-flight requests, and HTTP status code distribution.
-- **Custom Business & Application Metrics**:
-  - `candidate_status_updates_total`: Tracks candidate workflow transitions (`shortlisted`, `reviewed`, `archived`, etc.).
-  - `candidate_scores_total`: Tracks evaluation scores submitted per review category.
-  - `webhook_dispatches_total`: Tracks webhook delivery successes and failures by event type.
-  - `export_requests_total`: Tracks data export operations (CSV vs JSON ETL).
-  - `active_sse_connections`: Tracks live real-time score SSE streaming clients.
+### Access Points
 
-### 2. Accessing Dashboards & Metrics
-- **Grafana Dashboard**: Open `http://localhost:3000` (Default credentials: `admin` / `admin` with anonymous view access enabled).
-- **Prometheus Targets & Queries**: Open `http://localhost:9090/targets` to verify backend scrape health, or execute custom PromQL queries:
-  ```promql
-  # Average API latency (ms) over 1m window
-  sum(rate(http_request_duration_seconds_sum[1m])) / sum(rate(http_request_duration_seconds_count[1m])) * 1000
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Grafana Dashboard | http://localhost:3000 | Pre-provisioned observability dashboard (`admin`/`admin` or anonymous) |
+| Prometheus | http://localhost:9090 | PromQL query engine & alert rule evaluation |
+| Prometheus Targets | http://localhost:9090/targets | Scrape target health status |
+| Prometheus Alerts | http://localhost:9090/alerts | Active/pending/resolved alert rules |
+| Prometheus Rules | http://localhost:9090/rules | Recording & alerting rule evaluation status |
+| Alertmanager | http://localhost:9093 | Alert routing, silencing & inhibition UI |
+| Raw Metrics | http://localhost:8000/metrics | Prometheus exposition format endpoint |
 
-  # Requests per second by route and HTTP method
-  sum by (handler, method) (rate(http_request_duration_seconds_count[1m]))
+---
 
-  # Webhook delivery failure rate
-  sum(rate(webhook_dispatches_total{status="failed"}[5m]))
-  ```
-- **Raw Metrics**: Check the live Prometheus exposition format at `http://localhost:8000/metrics`.
+### 1. Alerting Pipeline (Prometheus → Alertmanager → Webhooks)
+
+Metrics alone are dashboards nobody watches. The stack includes a full alerting pipeline:
+
+```
+Backend → Prometheus (scrape) → Alert Rules (evaluate) → Alertmanager (route) → Webhook/Slack
+```
+
+**10 Alert Rules** across service health, performance, security, and SLO compliance:
+
+| Alert | Severity | Fires When |
+|-------|----------|------------|
+| `BackendDown` | 🔴 Critical | Scrape target unreachable for 30s |
+| `HighErrorRate` | 🔴 Critical | 5xx rate > 5% for 2 min |
+| `CriticalLatencyP99` | 🔴 Critical | p99 > 2.5s for 5 min |
+| `SLOErrorBudgetBurnRateHigh` | 🔴 Critical | Error budget burning at 14.4x rate (Google SRE multi-burn-rate pattern) |
+| `HighLatencyP99` | 🟡 Warning | p99 > 1s for 5 min |
+| `ElevatedClientErrorRate` | 🟡 Warning | 4xx rate > 25% for 5 min |
+| `HighInFlightRequests` | 🟡 Warning | Concurrent requests > 50 for 2 min |
+| `WebhookDeliveryFailures` | 🟡 Warning | Sustained webhook delivery failures |
+| `HighDatabaseLatency` | 🟡 Warning | DB p95 query latency > 500ms for 3 min |
+| `HighLoginFailureRate` | 🟡 Warning | Login failure rate > 50% for 5 min (brute-force detection) |
+
+**Alertmanager Configuration:**
+- **Severity-based routing**: Critical alerts → immediate channel (10s group wait), warnings → standard channel (30s group wait).
+- **Inhibition rules**: If `BackendDown` fires, all other alerts for the same service are suppressed (symptom deduplication). If any critical alert fires, corresponding warnings are inhibited.
+- **Receivers**: Configured with webhook receivers (swap to Slack/PagerDuty endpoints for production).
+
+---
+
+### 2. Recording Rules (Query Performance Optimization)
+
+Pre-computed PromQL expressions that avoid expensive re-computation on every dashboard refresh and alert evaluation cycle. This is a standard Prometheus best practice for operating at scale.
+
+| Recording Rule | What It Pre-Computes |
+|----------------|---------------------|
+| `job:http_requests:rate1m` | Total request rate |
+| `job:http_requests_by_status:rate1m` | Request rate by HTTP status code |
+| `job:http_request_errors:rate1m` | 5xx error rate |
+| `job:http_request_duration_seconds:p50_1m` | Pre-computed p50 latency |
+| `job:http_request_duration_seconds:p90_1m` | Pre-computed p90 latency |
+| `job:http_request_duration_seconds:p99_1m` | Pre-computed p99 latency |
+| `job:slo_availability:ratio1m` | Real-time SLO availability ratio |
+| `job:slo_error_budget_remaining:ratio1m` | Error budget burn tracking |
+| `job:db_query_duration_seconds:p50_1m` | Database p50 query latency |
+| `job:db_query_duration_seconds:p95_1m` | Database p95 query latency |
+| `job:auth_login_success:rate5m` | Login success rate |
+| `job:auth_login_failure:rate5m` | Login failure rate |
+
+Dashboard panels reference these recording rules instead of raw metrics, reducing Prometheus query load.
+
+---
+
+### 3. SLO & Error Budget Tracking
+
+The dashboard includes an **SLO Tracking & Error Budget** section following Google SRE best practices:
+
+- **SLO Target**: 99.9% availability (0.1% error budget over a 30-day window).
+- **SLO Availability Gauge**: Real-time success ratio (`1 - error_rate`) with threshold coloring.
+- **Error Budget Remaining Gauge**: Shows what fraction of the monthly error budget has been consumed.
+- **Availability vs Target Time Series**: Plots availability ratio over time with the 99.9% target line overlaid for visual SLO breach detection.
+- **Multi-Burn-Rate Alert**: The `SLOErrorBudgetBurnRateHigh` alert fires when errors are consuming the budget at 14.4x the sustainable rate (meaning the 30-day budget would be exhausted in ~2 days).
+
+---
+
+### 4. Custom Metrics Catalogue
+
+#### HTTP & API Telemetry
+| Metric | Type | Labels | Purpose |
+|--------|------|--------|---------|
+| `http_requests_total` | Counter | method, handler, status | Total request count by endpoint |
+| `http_request_duration_seconds` | Histogram | method, handler, status | Latency distribution (p50/p90/p99) |
+| `fastapi_inprogress_requests` | Gauge | method, handler | Concurrent in-flight requests |
+| `http_request_size_bytes` | Histogram | method, handler | Request payload size distribution |
+| `http_response_size_bytes` | Histogram | method, handler | Response payload size distribution |
+
+#### Database & Infrastructure
+| Metric | Type | Labels | Purpose |
+|--------|------|--------|---------|
+| `db_query_duration_seconds` | Histogram | operation | SQLAlchemy query latency by operation |
+| `app_info` | Info | name, version, python_version, framework | Service metadata for discovery |
+
+#### Authentication & Security
+| Metric | Type | Labels | Purpose |
+|--------|------|--------|---------|
+| `auth_login_attempts_total` | Counter | result (success/failure) | Login attempt tracking & brute-force detection |
+| `auth_active_sessions` | Gauge | — | Concurrent authenticated session count |
+
+#### Business & Application
+| Metric | Type | Labels | Purpose |
+|--------|------|--------|---------|
+| `candidate_status_updates_total` | Counter | status | Candidate workflow state transitions |
+| `candidate_scores_total` | Counter | category | Evaluation scores by review category |
+| `webhook_dispatches_total` | Counter | event_name, status | Webhook delivery success/failure tracking |
+| `export_requests_total` | Counter | format | Data export operations (CSV vs JSON) |
+| `active_sse_connections` | Gauge | — | Live SSE streaming client count |
+
+---
+
+### 5. Grafana Dashboard Sections
+
+The auto-provisioned dashboard (`TechKraft Candidate Review - Observability Dashboard`) contains **5 organized sections** with **22 panels**:
+
+1. **Application Health & KPIs** — Backend status, total requests, throughput, avg latency, error rate, SSE connections
+2. **API Request Traffic & Performance** — Throughput by endpoint, HTTP status breakdown, p50/p90/p99 latency, in-flight gauge
+3. **Candidate Review Pipeline & Business Analytics** — Status updates pie chart, scores by category, webhook deliveries, export formats, scrape duration
+4. **SLO Tracking & Error Budget** — SLO availability gauge, error budget remaining, availability vs target time series
+5. **Infrastructure & Security Monitoring** — DB query latency (p50/p95/p99), login activity (success vs failure), request/response payload sizes, active sessions, DB queries by operation
+
+---
+
+### 6. Example PromQL Queries
+
+```promql
+# Average API latency (ms) over 1m window using recording rule
+job:http_request_duration_seconds:p50_1m * 1000
+
+# Requests per second by route (pre-aggregated)
+job:http_requests_by_handler:rate1m
+
+# Current SLO availability (from recording rule)
+job:slo_availability:ratio1m{job="candidate-review-backend"}
+
+# Error budget burn rate (how fast are we consuming the monthly budget?)
+(1 - job:slo_availability:ratio1m) / 0.001
+
+# Webhook delivery failure rate
+sum(rate(webhook_dispatches_total{status="failed"}[5m]))
+
+# Database p95 query latency by operation
+histogram_quantile(0.95, sum by (le, operation) (rate(db_query_duration_seconds_bucket[5m])))
+
+# Login failure ratio (brute-force detection signal)
+job:auth_login_failure:rate5m / (job:auth_login_success:rate5m + job:auth_login_failure:rate5m)
+
+# Top 5 slowest API endpoints by p99 latency
+topk(5, histogram_quantile(0.99, sum by (le, handler) (rate(http_request_duration_seconds_bucket[5m]))))
+
+# Request body size anomaly detection (p95 > 100KB)
+histogram_quantile(0.95, sum by (le) (rate(http_request_size_bytes_bucket[5m]))) > 102400
+```
+
+### 7. Infrastructure-as-Code (IaC) Summary
+
+Every monitoring component is version-controlled and auto-provisioned — no manual Grafana UI clicks:
+
+| Component | Config File | Provisioning Method |
+|-----------|-------------|-------------------|
+| Prometheus scrape config | `monitoring/prometheus/prometheus.yml` | Mounted as read-only volume |
+| Alerting rules | `monitoring/prometheus/alert_rules.yml` | Loaded via `rule_files` directive |
+| Recording rules | `monitoring/prometheus/recording_rules.yml` | Loaded via `rule_files` directive |
+| Alertmanager routing | `monitoring/alertmanager/alertmanager.yml` | Mounted as read-only volume |
+| Grafana data source | `monitoring/grafana/provisioning/datasources/prometheus.yml` | Grafana provisioning API |
+| Grafana dashboard | `monitoring/grafana/dashboards/candidate_review_overview.json` | Grafana file provisioner |
+| Grafana alert rules | `monitoring/grafana/provisioning/alerting/alerts.yml` | Grafana unified alerting provisioner |
 
