@@ -3,6 +3,19 @@ global:
   evaluation_interval: 5s
   scrape_timeout: 4s
 
+# Alerting configuration — routes firing alerts to Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+      scheme: http
+      timeout: 10s
+
+# Alert & recording rule files evaluated at evaluation_interval
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+  - '/etc/prometheus/recording_rules.yml'
+
 scrape_configs:
   - job_name: 'candidate-review-backend'
     metrics_path: '/metrics'
@@ -17,3 +30,9 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets: ['localhost:9090']
+
+  - job_name: 'alertmanager'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['alertmanager:9093']
