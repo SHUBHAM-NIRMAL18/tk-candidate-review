@@ -1,0 +1,79 @@
+# Alertmanager Configuration
+# Routes alerts from Prometheus to appropriate notification channels.
+# In production, replace webhook_url with your Slack/PagerDuty/OpsGenie endpoint.
+
+global:
+  resolve_timeout: 5m
+  # smtp_smarthost: 'smtp.example.com:587'
+  # smtp_from: 'alertmanager@example.com'
+
+# Alert routing tree
+route:
+  # Default receiver for unmatched alerts
+  receiver: 'default-webhook'
+
+  # Group alerts by these labels to reduce notification noise.
+  # Alerts with the same alertname + service are batched into one notification.
+  group_by: ['alertname', 'service']
+
+  # How long to wait before sending the first notification for a new group.
+  group_wait: 30s
+
+  # How long to wait before sending notifications about new alerts
+  # added to an already-firing group.
+  group_interval: 5m
+
+  # How long to wait before re-sending a notification for a firing alert
+  # that has already been notified.
+  repeat_interval: 4h
+
+  # Child routes for severity-based routing
+  routes:
+    # Critical alerts → immediate notification channel
+    - match:
+        severity: critical
+      receiver: 'critical-webhook'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts → standard notification channel
+    - match:
+        severity: warning
+      receiver: 'default-webhook'
+      repeat_interval: 4h
+
+# Notification receivers
+receivers:
+  - name: 'default-webhook'
+    webhook_configs:
+      - url: 'http://backend:8000/api/v1/integrations/alert-sink'
+        send_resolved: true
+        # In production, replace with your Slack incoming webhook:
+        # - url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+  - name: 'critical-webhook'
+    webhook_configs:
+      - url: 'http://backend:8000/api/v1/integrations/alert-sink'
+        send_resolved: true
+        # In production, use PagerDuty or OpsGenie for critical alerts:
+        # pagerduty_configs:
+        #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+
+# Inhibition rules
+# Suppress lower-severity alerts when a higher-severity alert is already firing
+# for the same service. Prevents alert fatigue during incidents.
+inhibit_rules:
+  # If a critical alert is firing for a service, suppress warnings for the same service
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['service']
+
+  # If the backend is completely down, suppress all other alerts for it
+  # (they're all symptoms of the same root cause)
+  - source_matchers:
+      - alertname = "BackendDown"
+    target_matchers:
+      - service = "candidate-review-backend"
+    equal: ['service']
