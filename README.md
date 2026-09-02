@@ -126,6 +126,11 @@ def search_candidates(db: Session, status: str = None, keyword: str = None, sort
 - **Decision:** Implemented an enterprise `IdempotencyMiddleware` backed by an indexed `idempotency_keys` table with 24h TTL, canonical request SHA-256 hashing, and cached response replay.
 - **Trade-off:** Adds an initial database lookup on mutating calls, but guarantees zero duplicate side-effects, rejects payload tampering with HTTP `422`, and detects concurrent in-flight requests with HTTP `409 Conflict`.
 
+### ADR 6: In-Memory Token Bucket Rate Limiting with RFC Standard Headers
+- **Context:** Protect API against brute-force password spraying on auth endpoints and prevent aggressive scraping or resource starvation on candidate and export APIs.
+- **Decision:** Built a high-performance in-memory `TokenBucket` rate limiter middleware with sub-second refill precision, client identity resolution (API Key, JWT token hash, or IP), and RFC standard rate limit headers (`X-RateLimit-*` and `Retry-After`).
+- **Trade-off:** In-memory tracking provides zero-latency enforcement without external database queries, but resets on server restart; in a distributed multi-node deployment, Redis would be used as a shared token store.
+
 ---
 
 ## Known Limitations
@@ -133,8 +138,8 @@ def search_candidates(db: Session, status: str = None, keyword: str = None, sort
 - Keyword search uses basic `ILIKE` filtering, which works fine for this dataset size but would need full-text search at scale.
 - SSE broadcaster is in-memory only, so restarting the backend drops active live streams.
 - Frontend styling focuses on a clean, modern UI (Plus Jakarta Sans typography, status pills, interactive modals, responsive mobile cards) while maintaining clear visual hierarchy.
-- Test suite is split into modular Pytest modules (`test_auth.py`, `test_candidates.py`, `test_scores.py`) covering registration role hardcoding, password strength, score isolation, token blacklisting on logout, and admin soft delete.
-- Login rate limiting is not included yet, though adding `slowapi` middleware would handle that easily.
+- Test suite is split into modular Pytest modules (`test_auth.py`, `test_candidates.py`, `test_scores.py`, `test_idempotency.py`, `test_rate_limiter.py`) covering registration role hardcoding, password strength, score isolation, token blacklisting, soft delete, idempotency replays, and rate limiting.
+- In-memory rate limiting operates per backend process; horizontal multi-instance scaling would leverage Redis for shared bucket synchronization.
 
 ---
 
@@ -258,6 +263,55 @@ All mutating endpoints (`POST`, `PUT`, `PATCH`, `DELETE`) support **Idempotency 
 | `Idempotency-Key` | `e8a4d712-...` | Echoes the client-provided key |
 | `X-Cache-Lookup` | `MISS-IDEMPOTENT` / `HIT-IDEMPOTENT` / `MISMATCH-IDEMPOTENT` | Cache evaluation outcome |
 | `Idempotency-Replayed` | `true` | Present only when replaying cached responses |
+
+---
+
+## Token Bucket Rate Limiter with Standard Headers
+
+The API enforces tiered rate limiting using the **Token Bucket algorithm** to defend against brute-force attacks, credential stuffing, and runaway client scripts.
+
+### Rate Limiting Architecture & Workflow
+
+```mermaid
+flowchart TD
+    Req[Incoming HTTP Request] --> CheckExempt{Is Path Exempt?<br>/metrics, /docs}
+    CheckExempt -- Yes --> Next[Call Next Handler]
+    CheckExempt -- No --> Identify[Resolve Client Identifier<br>Token / API Key / IP]
+    Identify --> TierSelect{Select Policy Tier}
+    TierSelect -- /api/v1/auth/login --> AuthTier[Auth Tier<br>Capacity: 10, Refill: 5/min]
+    TierSelect -- Other /api/v1/* --> StandardTier[Standard Tier<br>Capacity: 60, Refill: 60/min]
+    
+    AuthTier --> BucketCalc[Refill & Check Token Bucket]
+    StandardTier --> BucketCalc
+    
+    BucketCalc --> HasToken{Tokens >= 1?}
+    HasToken -- Yes --> Consume[Deduct 1 Token<br>Add RateLimit Headers] --> Next
+    HasToken -- No --> Reject[Return HTTP 429 Too Many Requests<br>Header: Retry-After: N<br>Metric: rate_limit_exceeded_total++]
+```
+
+### Policy Tiers
+| Tier | Endpoints | Capacity (Burst) | Refill Rate | Purpose |
+|------|-----------|------------------|-------------|---------|
+| **Auth Tier** | `/api/v1/auth/login`, `/api/v1/auth/register` | 10 requests | 5 req/min (0.083/sec) | Prevents password spraying and brute force |
+| **Standard Tier** | All `/api/v1/*` endpoints | 60 requests | 60 req/min (1.0/sec) | Accommodates bursts while curbing scraping |
+| **Exempt** | `/metrics`, `/docs`, `/openapi.json`, `/` | Unlimited | Unlimited | Internal monitoring & documentation |
+
+### Standard RFC Response Headers
+Every API response includes standard rate limit headers:
+| Header | Description | Example |
+|--------|-------------|---------|
+| `X-RateLimit-Limit` | Maximum burst bucket capacity | `60` |
+| `X-RateLimit-Remaining` | Tokens currently remaining in the bucket | `59` |
+| `X-RateLimit-Reset` | Seconds until bucket reaches full capacity | `1` |
+| `Retry-After` | Seconds until at least 1 token is available (on HTTP 429) | `12` |
+
+### HTTP 429 Too Many Requests Response
+When bucket tokens are exhausted, the server returns HTTP 429:
+```json
+{
+  "detail": "Rate limit exceeded for auth tier. Please retry in 12 seconds."
+}
+```
 
 ---
 
