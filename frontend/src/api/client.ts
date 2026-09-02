@@ -1,7 +1,20 @@
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'idem_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+}
+
 export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const defaultHeaders: HeadersInit = {
+  const method = (options.method || 'GET').toUpperCase();
+  const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
   };
+
+  // Automatically attach Idempotency-Key to mutating requests to prevent duplicate submissions
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    defaultHeaders['Idempotency-Key'] = generateIdempotencyKey();
+  }
 
   const config: RequestInit = {
     ...options,
