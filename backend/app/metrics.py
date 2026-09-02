@@ -128,6 +128,15 @@ IDEMPOTENCY_OPERATIONS_TOTAL = Counter(
     ["result"],  # hit, miss, mismatch, conflict, bypass
 )
 
+# ── Rate Limiting Metrics ────────────────────────────────────────────────
+# Tracks rate limiting throttles across policy tiers (auth vs standard)
+# and client authentication types (user, apikey, ip).
+RATE_LIMIT_EXCEEDED_TOTAL = Counter(
+    "rate_limit_exceeded_total",
+    "Total number of HTTP requests rejected due to rate limit exhaustion",
+    ["tier", "client_type"],
+)
+
 def get_route_path(request: Request) -> str:
     """Finds the matched route path template (e.g. /api/v1/candidates/{id}) to avoid metric label explosion."""
     if hasattr(request, "app") and hasattr(request.app, "routes"):
