@@ -121,6 +121,11 @@ def search_candidates(db: Session, status: str = None, keyword: str = None, sort
 - **Decision:** Built an in-memory `asyncio.Queue` broadcaster exposed via FastAPI `StreamingResponse` (`text/event-stream`).
 - **Trade-off:** Provides lightweight real-time capabilities without external infrastructure, though a distributed message broker (such as Redis Pub/Sub) would be required for multi-replica horizontal scaling.
 
+### ADR 5: Database-Backed Idempotency Middleware with SHA-256 Fingerprinting
+- **Context:** Unreliable client connections, mobile retries, and rapid double-clicks could cause duplicate candidate creation or duplicate evaluation scoring.
+- **Decision:** Implemented an enterprise `IdempotencyMiddleware` backed by an indexed `idempotency_keys` table with 24h TTL, canonical request SHA-256 hashing, and cached response replay.
+- **Trade-off:** Adds an initial database lookup on mutating calls, but guarantees zero duplicate side-effects, rejects payload tampering with HTTP `422`, and detects concurrent in-flight requests with HTTP `409 Conflict`.
+
 ---
 
 ## Known Limitations
@@ -217,6 +222,42 @@ curl -X POST "http://localhost:8000/api/v1/integrations/webhooks" \
     "description": "Slack Alert & ATS Sync"
   }'
 ```
+
+### 10. Safe Retries with Idempotency Key
+```bash
+# 1st attempt: Creates candidate and caches response (X-Cache-Lookup: MISS-IDEMPOTENT)
+curl -X POST "http://localhost:8000/api/v1/candidates" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: e8a4d712-42bb-4c28-98e1-51829e01d123" \
+  -d '{"name": "Margaret Hamilton", "email": "margaret@mit.edu", "role_applied": "Apollo Flight Software Lead"}'
+
+# 2nd attempt (network retry): Replays exact cached response without duplicate DB insert (X-Cache-Lookup: HIT-IDEMPOTENT)
+curl -X POST "http://localhost:8000/api/v1/candidates" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: e8a4d712-42bb-4c28-98e1-51829e01d123" \
+  -d '{"name": "Margaret Hamilton", "email": "margaret@mit.edu", "role_applied": "Apollo Flight Software Lead"}'
+```
+
+---
+
+## Enterprise Idempotency & Safe Retries
+
+All mutating endpoints (`POST`, `PUT`, `PATCH`, `DELETE`) support **Idempotency Keys** (the Stripe / AWS / GitHub API standard). This guarantees that network timeouts or rapid double-clicks on the frontend never create duplicate candidates, scores, or webhooks.
+
+### How It Works
+1. **First Request (`MISS-IDEMPOTENT`)**: The server hashes the canonical request payload (SHA-256), records the key as `PROCESSING`, executes the database transaction, caches the response, and returns `X-Cache-Lookup: MISS-IDEMPOTENT`.
+2. **Replayed Request (`HIT-IDEMPOTENT`)**: If the same key is sent with the exact same payload, the server immediately replays the cached status code and response body (`Idempotency-Replayed: true`, `X-Cache-Lookup: HIT-IDEMPOTENT`) with zero database mutation.
+3. **Payload Mismatch Protection (`422 Unprocessable Entity`)**: If a key is reused with altered payload parameters, the server rejects it with `HTTP 422 Unprocessable Entity` (`MISMATCH-IDEMPOTENT`).
+4. **Concurrent Race Protection (`409 Conflict`)**: If a second request arrives while the first is still `PROCESSING`, the server returns `HTTP 409 Conflict` with a `Retry-After: 2` header.
+
+### Idempotency Response Headers
+| Header | Example Value | Description |
+|--------|---------------|-------------|
+| `Idempotency-Key` | `e8a4d712-...` | Echoes the client-provided key |
+| `X-Cache-Lookup` | `MISS-IDEMPOTENT` / `HIT-IDEMPOTENT` / `MISMATCH-IDEMPOTENT` | Cache evaluation outcome |
+| `Idempotency-Replayed` | `true` | Present only when replaying cached responses |
 
 ---
 
