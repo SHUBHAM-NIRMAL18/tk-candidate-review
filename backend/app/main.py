@@ -11,6 +11,7 @@ from app.routers import integrations as integrations_router
 from app.routers import export as export_router
 from app.seed import seed_database
 from app.metrics import setup_metrics
+from app.idempotency import IdempotencyMiddleware
 
 Base.metadata.create_all(bind=engine)
 
@@ -48,6 +49,9 @@ app.include_router(export_router.router)
 
 # Initialize Prometheus instrumentation & /metrics route
 setup_metrics(app)
+
+# Initialize Idempotency Middleware for safe request retries on mutating endpoints
+app.add_middleware(IdempotencyMiddleware)
 
 @app.get("/")
 def read_root():
