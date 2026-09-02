@@ -119,6 +119,15 @@ ACTIVE_SSE_CONNECTIONS = Gauge(
     "Number of currently active SSE stream subscribers",
 )
 
+# ── Idempotency Metrics ──────────────────────────────────────────────────
+# Tracks idempotency outcomes on mutating API calls (replay hits, fresh misses,
+# payload mismatch rejections, and concurrent request conflicts).
+IDEMPOTENCY_OPERATIONS_TOTAL = Counter(
+    "idempotency_operations_total",
+    "Total count of idempotency key evaluation outcomes",
+    ["result"],  # hit, miss, mismatch, conflict, bypass
+)
+
 def get_route_path(request: Request) -> str:
     """Finds the matched route path template (e.g. /api/v1/candidates/{id}) to avoid metric label explosion."""
     if hasattr(request, "app") and hasattr(request.app, "routes"):
