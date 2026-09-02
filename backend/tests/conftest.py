@@ -29,6 +29,13 @@ def setup_test_database():
     yield
     Base.metadata.drop_all(bind=engine)
 
+@pytest.fixture(scope="function", autouse=True)
+def reset_rate_limit_registry():
+    from app.rate_limiter import registry
+    registry.reset_for_tests()
+    yield
+    registry.reset_for_tests()
+
 @pytest.fixture(scope="function")
 def db_session(setup_test_database):
     db = TestingSessionLocal()
