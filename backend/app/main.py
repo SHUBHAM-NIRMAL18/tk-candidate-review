@@ -12,6 +12,7 @@ from app.routers import export as export_router
 from app.seed import seed_database
 from app.metrics import setup_metrics
 from app.idempotency import IdempotencyMiddleware
+from app.rate_limiter import RateLimitMiddleware
 
 Base.metadata.create_all(bind=engine)
 
@@ -52,6 +53,9 @@ setup_metrics(app)
 
 # Initialize Idempotency Middleware for safe request retries on mutating endpoints
 app.add_middleware(IdempotencyMiddleware)
+
+# Initialize Token Bucket Rate Limiter with RFC standard headers
+app.add_middleware(RateLimitMiddleware)
 
 @app.get("/")
 def read_root():
