@@ -36,6 +36,13 @@ def reset_rate_limit_registry():
     yield
     registry.reset_for_tests()
 
+@pytest.fixture(scope="function", autouse=True)
+def clear_cache():
+    from app.cache import cache
+    cache.clear()
+    yield
+    cache.clear()
+
 @pytest.fixture(scope="function")
 def db_session(setup_test_database):
     db = TestingSessionLocal()
