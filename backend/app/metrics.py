@@ -137,6 +137,14 @@ RATE_LIMIT_EXCEEDED_TOTAL = Counter(
     ["tier", "client_type"],
 )
 
+# ── Redis Caching Metrics ────────────────────────────────────────────────
+# Tracks Redis cache hits, misses, sets, invalidations, and fallback operations.
+CACHE_OPERATIONS_TOTAL = Counter(
+    "cache_operations_total",
+    "Total number of cache operations by type and outcome",
+    ["operation", "status"],  # operation: get, set, invalidate; status: hit, miss, success, error
+)
+
 def get_route_path(request: Request) -> str:
     """Finds the matched route path template (e.g. /api/v1/candidates/{id}) to avoid metric label explosion."""
     if hasattr(request, "app") and hasattr(request.app, "routes"):
