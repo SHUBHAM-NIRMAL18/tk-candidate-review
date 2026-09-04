@@ -14,10 +14,46 @@ from app.metrics import setup_metrics
 from app.idempotency import IdempotencyMiddleware
 from app.rate_limiter import RateLimitMiddleware
 
-Base.metadata.create_all(bind=engine)
+def run_migrations():
+    """Runs pending Alembic database migrations on startup with brownfield auto-stamp support."""
+    import logging
+    logger = logging.getLogger("alembic.runtime")
+    try:
+        from alembic.config import Config
+        from alembic import command
+        from sqlalchemy import inspect, text
+
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        ini_path = os.path.join(base_dir, "alembic.ini")
+        alembic_cfg = Config(ini_path)
+        alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "alembic"))
+
+        # Inspect database: if tables exist from legacy create_all without alembic_version, stamp to baseline
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+        needs_stamp = False
+        if "users" in existing_tables:
+            if "alembic_version" not in existing_tables:
+                needs_stamp = True
+            else:
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+                    if not result:
+                        needs_stamp = True
+
+        if needs_stamp:
+            logger.info("Existing database detected without revision tracking. Stamping to baseline 001_initial_schema.")
+            command.stamp(alembic_cfg, "001_initial_schema")
+
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database schema migrated to latest Alembic revision.")
+    except Exception as exc:
+        logger.warning("Automated migration fallback due to: %s. Using metadata create_all.", exc)
+        Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_migrations()
     db = SessionLocal()
     try:
         seed_database(db)
