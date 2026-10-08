@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import {
@@ -18,12 +18,21 @@ import {
   ArrowUpDown,
   BarChart3,
   KeyRound,
+  Download,
+  ChevronDown,
+  FileSpreadsheet,
+  FileCode,
+  RotateCcw,
+  SearchX,
+  Eye,
 } from 'lucide-react';
 import { fetchCandidates, createCandidate, softDeleteCandidate } from '../api/candidate';
+import { getExportCsvUrl, getExportJsonUrl } from '../api/integrations';
 import type { Candidate, CandidateCreateInput } from '../types/candidate';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AddCandidateModal } from '../components/AddCandidateModal';
 import { IntegrationsModal } from '../components/IntegrationsModal';
+import { CandidateDrawer } from '../components/CandidateDrawer';
 import { Toast } from '../components/Toast';
 import { consumeToast, type ToastData } from '../utils/toast';
 import '../styles/DashboardPage.css';
@@ -47,6 +56,14 @@ export const DashboardPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('average_score');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Phase 1: Slide-out drawer state
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Phase 1: Direct table export dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIntegrationsModal, setShowIntegrationsModal] = useState(false);
   const [archiveCandidateTarget, setArchiveCandidateTarget] = useState<Candidate | null>(null);
@@ -54,6 +71,17 @@ export const DashboardPage: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
+
+  // Click outside to dismiss export menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const pendingToast = consumeToast();
@@ -155,6 +183,44 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleOpenDrawer = (cand: Candidate) => {
+    setSelectedCandidate(cand);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+  };
+
+  const handleResetFilters = () => {
+    setKeywordInput('');
+    setStatusFilter('');
+    setRoleFilter('');
+    setSkillFilter('');
+    setPage(1);
+  };
+
+  const handleTriggerExport = (format: 'csv' | 'json') => {
+    setShowExportMenu(false);
+    const url =
+      format === 'csv'
+        ? getExportCsvUrl(statusFilter || undefined)
+        : getExportJsonUrl(statusFilter || undefined);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', '');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setToast({
+      title: 'Export Started',
+      message: `Downloading ${format.toUpperCase()} export${statusFilter ? ` for status: "${statusFilter}"` : ''}...`,
+      type: 'success',
+    });
+  };
+
   const handleConfirmLogout = async () => {
     try {
       setIsLoggingOut(true);
@@ -210,6 +276,17 @@ export const DashboardPage: React.FC = () => {
       <IntegrationsModal
         isOpen={showIntegrationsModal}
         onClose={() => setShowIntegrationsModal(false)}
+      />
+
+      <CandidateDrawer
+        candidate={selectedCandidate}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        userRole={user?.role}
+        onCandidateUpdate={loadCandidates}
+        candidatesList={candidates}
+        onSelectCandidate={(cand) => setSelectedCandidate(cand)}
+        onOpenArchiveModal={(cand) => setArchiveCandidateTarget(cand)}
       />
 
       <header className="dashboard-header">
@@ -321,7 +398,22 @@ export const DashboardPage: React.FC = () => {
 
         <div className="table-container">
           <div className="table-header">
-            <h3>Candidate Directory</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h3 style={{ margin: 0 }}>Candidate Directory</h3>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: '#64748b',
+                  backgroundColor: '#f1f5f9',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                {total} total
+              </span>
+            </div>
 
             <div className="filter-controls-group">
               <div className="search-box">
@@ -396,17 +488,176 @@ export const DashboardPage: React.FC = () => {
                 <option value="created_at-desc">Sort: Newest First</option>
                 <option value="created_at-asc">Sort: Oldest First</option>
               </select>
+
+              {/* Direct Export Dropdown */}
+              <div className="export-dropdown-wrapper" ref={exportMenuRef}>
+                <button
+                  type="button"
+                  className="btn-export-dropdown"
+                  onClick={() => setShowExportMenu((prev) => !prev)}
+                  title="Export Candidates"
+                >
+                  <Download size={14} />
+                  <span>Export</span>
+                  <ChevronDown
+                    size={13}
+                    className={`chevron-export ${showExportMenu ? 'open' : ''}`}
+                  />
+                </button>
+
+                {showExportMenu && (
+                  <div className="export-menu-dropdown">
+                    <div className="export-menu-header">Export Candidate Records</div>
+                    <button
+                      type="button"
+                      className="export-menu-item"
+                      onClick={() => handleTriggerExport('csv')}
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        style={{ color: '#059669', flexShrink: 0, marginTop: '2px' }}
+                      />
+                      <div>
+                        <strong>Export as CSV</strong>
+                        <span>Formatted spreadsheet for Excel & Google Sheets</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="export-menu-item"
+                      onClick={() => handleTriggerExport('json')}
+                    >
+                      <FileCode
+                        size={16}
+                        style={{ color: '#2563eb', flexShrink: 0, marginTop: '2px' }}
+                      />
+                      <div>
+                        <strong>Export as JSON</strong>
+                        <span>Structured data payloads with nested scores</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {loading ? (
-            <div className="table-loading">
-              <div className="spinner-lg" />
-              <p>Loading Candidates...</p>
-            </div>
+            <>
+              {/* Shimmer Skeleton Desktop Table */}
+              <div className="desktop-table-view">
+                <table className="candidate-table">
+                  <thead>
+                    <tr>
+                      {renderSortHeader('Candidate Name', 'name')}
+                      {renderSortHeader('Role Applied', 'role_applied')}
+                      {renderSortHeader('Status', 'status')}
+                      <th>Skills</th>
+                      {renderSortHeader('Avg Score', 'average_score')}
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map((idx) => (
+                      <tr key={idx} className="skeleton-row">
+                        <td>
+                          <div className="skeleton-name-box">
+                            <div className="skeleton-shimmer skeleton-line title" />
+                            <div className="skeleton-shimmer skeleton-line sub" />
+                          </div>
+                        </td>
+                        <td>
+                          <div
+                            className="skeleton-shimmer skeleton-line title"
+                            style={{ margin: '0 auto', width: 95 }}
+                          />
+                        </td>
+                        <td>
+                          <div className="skeleton-shimmer skeleton-line badge" />
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '0.25rem',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <div className="skeleton-shimmer skeleton-line pill" />
+                            <div
+                              className="skeleton-shimmer skeleton-line pill"
+                              style={{ width: 44 }}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <div className="skeleton-shimmer skeleton-line score" />
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '0.375rem',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <div
+                              className="skeleton-shimmer skeleton-line btn"
+                              style={{ width: 54 }}
+                            />
+                            <div
+                              className="skeleton-shimmer skeleton-line btn"
+                              style={{ width: 54 }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Shimmer Skeleton Mobile Cards */}
+              <div className="mobile-candidate-cards">
+                {[1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className="mobile-candidate-card"
+                    style={{ gap: '0.75rem' }}
+                  >
+                    <div
+                      className="skeleton-shimmer skeleton-line title"
+                      style={{ width: '45%' }}
+                    />
+                    <div
+                      className="skeleton-shimmer skeleton-line sub"
+                      style={{ width: '65%' }}
+                    />
+                    <div
+                      className="skeleton-shimmer skeleton-line score"
+                      style={{ width: 75, margin: 0 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
           ) : candidates.length === 0 ? (
-            <div className="table-empty">
-              <p>No candidates found matching the selected filters.</p>
+            <div className="table-empty-box">
+              <div className="empty-icon-wrapper">
+                <SearchX size={26} />
+              </div>
+              <h4>No candidates found</h4>
+              <p>
+                {keywordInput || statusFilter || roleFilter || skillFilter
+                  ? 'No candidate profiles matched your active filters or search terms.'
+                  : 'There are no active candidate records available in the directory.'}
+              </p>
+              {(keywordInput || statusFilter || roleFilter || skillFilter) && (
+                <button onClick={handleResetFilters} className="btn-reset-filters">
+                  <RotateCcw size={14} />
+                  <span>Clear All Filters</span>
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -427,8 +678,13 @@ export const DashboardPage: React.FC = () => {
                     {candidates.map((cand) => (
                       <tr
                         key={cand.id}
-                        onClick={() => navigate(`/candidate/${cand.id}`)}
-                        className="clickable-row"
+                        onClick={() => handleOpenDrawer(cand)}
+                        className={`clickable-row ${
+                          selectedCandidate?.id === cand.id && isDrawerOpen
+                            ? 'selected-row-active'
+                            : ''
+                        }`}
+                        title="Click to preview candidate profile"
                       >
                         <td data-label="Candidate">
                           <div className="candidate-cell">
@@ -445,11 +701,14 @@ export const DashboardPage: React.FC = () => {
                         <td data-label="Skills">
                           <div className="skill-badges">
                             {cand.skills
-                              ? cand.skills.split(',').slice(0, 3).map((s, idx) => (
-                                  <span key={idx} className="mini-skill-badge">
-                                    {s.trim()}
-                                  </span>
-                                ))
+                              ? cand.skills
+                                  .split(',')
+                                  .slice(0, 3)
+                                  .map((s, idx) => (
+                                    <span key={idx} className="mini-skill-badge">
+                                      {s.trim()}
+                                    </span>
+                                  ))
                               : '—'}
                           </div>
                         </td>
@@ -463,8 +722,18 @@ export const DashboardPage: React.FC = () => {
                         <td data-label="Actions" onClick={(e) => e.stopPropagation()}>
                           <div className="action-buttons">
                             <button
+                              onClick={() => handleOpenDrawer(cand)}
+                              className="action-btn peek-btn"
+                              title="Quick Preview Drawer"
+                            >
+                              <Eye size={14} />
+                              <span>Peek</span>
+                            </button>
+
+                            <button
                               onClick={() => navigate(`/candidate/${cand.id}`)}
                               className="action-btn view-btn"
+                              title="Open Full Profile Page"
                             >
                               <ExternalLink size={14} />
                               <span>Review</span>
@@ -493,8 +762,12 @@ export const DashboardPage: React.FC = () => {
                 {candidates.map((cand) => (
                   <div
                     key={cand.id}
-                    className="mobile-candidate-card"
-                    onClick={() => navigate(`/candidate/${cand.id}`)}
+                    className={`mobile-candidate-card ${
+                      selectedCandidate?.id === cand.id && isDrawerOpen
+                        ? 'selected-row-active'
+                        : ''
+                    }`}
+                    onClick={() => handleOpenDrawer(cand)}
                   >
                     <div className="mobile-card-top">
                       <div className="candidate-cell">
@@ -523,21 +796,32 @@ export const DashboardPage: React.FC = () => {
 
                     {cand.skills && (
                       <div className="skill-badges">
-                        {cand.skills.split(',').slice(0, 4).map((s, idx) => (
-                          <span key={idx} className="mini-skill-badge">
-                            {s.trim()}
-                          </span>
-                        ))}
+                        {cand.skills
+                          .split(',')
+                          .slice(0, 4)
+                          .map((s, idx) => (
+                            <span key={idx} className="mini-skill-badge">
+                              {s.trim()}
+                            </span>
+                          ))}
                       </div>
                     )}
 
                     <div className="mobile-card-actions" onClick={(e) => e.stopPropagation()}>
                       <button
+                        onClick={() => handleOpenDrawer(cand)}
+                        className="action-btn peek-btn"
+                      >
+                        <Eye size={14} />
+                        <span>Quick Peek</span>
+                      </button>
+
+                      <button
                         onClick={() => navigate(`/candidate/${cand.id}`)}
                         className="action-btn view-btn"
                       >
                         <ExternalLink size={14} />
-                        <span>Review Profile</span>
+                        <span>Full Profile</span>
                       </button>
 
                       {isAdmin && (
