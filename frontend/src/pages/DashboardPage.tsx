@@ -25,10 +25,14 @@ import {
   RotateCcw,
   SearchX,
   Eye,
+  Clock3,
+  Sparkles,
 } from 'lucide-react';
 import { fetchCandidates, createCandidate, softDeleteCandidate } from '../api/candidate';
+import { fetchAnalytics } from '../api/analytics';
 import { getExportCsvUrl, getExportJsonUrl } from '../api/integrations';
 import type { Candidate, CandidateCreateInput } from '../types/candidate';
+import type { AnalyticsResponse } from '../types/analytics';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { AddCandidateModal } from '../components/AddCandidateModal';
 import { IntegrationsModal } from '../components/IntegrationsModal';
@@ -71,6 +75,22 @@ export const DashboardPage: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
+
+  // Server-wide analytics metrics for stats bar
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsResponse | null>(null);
+
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const data = await fetchAnalytics();
+      setAnalyticsData(data);
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   // Click outside to dismiss export menu
   useEffect(() => {
@@ -161,6 +181,7 @@ export const DashboardPage: React.FC = () => {
     });
     setPage(1);
     loadCandidates();
+    loadAnalytics();
   };
 
   const handleConfirmArchive = async () => {
@@ -175,6 +196,7 @@ export const DashboardPage: React.FC = () => {
       });
       setArchiveCandidateTarget(null);
       loadCandidates();
+      loadAnalytics();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to archive candidate';
       setToast({ title: 'Error', message: msg, type: 'error' });
@@ -231,6 +253,50 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getUserInitials = (email?: string) => {
+    if (!email) return 'U';
+    const namePart = email.split('@')[0];
+    const parts = namePart.split(/[._-]/);
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return namePart.slice(0, 2).toUpperCase();
+  };
+
+  const getUserDisplayName = (email?: string) => {
+    if (!email) return 'User';
+    const namePart = email.split('@')[0];
+    const clean = namePart.replace(/[._-]/g, ' ');
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  };
+
+  const handleKpiFilterClick = (targetStatus: string) => {
+    if (statusFilter === targetStatus) {
+      setStatusFilter('');
+    } else {
+      setStatusFilter(targetStatus);
+    }
+    setPage(1);
+  };
+
+  const activeCount = analyticsData?.kpis.active_candidates ?? total;
+  const newCount =
+    analyticsData?.funnel.find((f) => f.stage === 'new')?.count ??
+    candidates.filter((c) => c.status === 'new').length;
+  const inReviewCount =
+    analyticsData?.funnel.find((f) => f.stage === 'reviewed')?.count ??
+    candidates.filter((c) => c.status === 'reviewed').length;
+  const hiredCount =
+    analyticsData?.funnel.find((f) => f.stage === 'hired')?.count ??
+    candidates.filter((c) => c.status === 'hired').length;
+
   return (
     <div className="dashboard-layout">
       {toast && (
@@ -283,7 +349,10 @@ export const DashboardPage: React.FC = () => {
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
         userRole={user?.role}
-        onCandidateUpdate={loadCandidates}
+        onCandidateUpdate={() => {
+          loadCandidates();
+          loadAnalytics();
+        }}
         candidatesList={candidates}
         onSelectCandidate={(cand) => setSelectedCandidate(cand)}
         onOpenArchiveModal={(cand) => setArchiveCandidateTarget(cand)}
@@ -313,12 +382,17 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="header-right">
-          <div className="user-info">
-            <span className="user-email">{user?.email}</span>
-            <span className={`role-badge ${user?.role}`}>
-              <Shield size={12} />
-              {user?.role}
-            </span>
+          <div className="user-profile-badge">
+            <div className="user-avatar" title={user?.email}>
+              {getUserInitials(user?.email)}
+            </div>
+            <div className="user-details">
+              <span className="user-email">{user?.email}</span>
+              <span className={`role-badge ${user?.role}`}>
+                <Shield size={11} />
+                {user?.role}
+              </span>
+            </div>
           </div>
 
           <button
@@ -334,22 +408,30 @@ export const DashboardPage: React.FC = () => {
 
       <main className="dashboard-main">
         <div className="welcome-banner">
-          <div>
-            <h1>Welcome, {user?.email}!</h1>
+          <div className="welcome-content">
+            <div className="welcome-greeting">
+              <h1>
+                {getGreeting()},{' '}
+                <span className="greeting-name">{getUserDisplayName(user?.email)}</span>!
+              </h1>
+              <span className="welcome-role-tag">
+                <Sparkles size={13} />
+                <span>{user?.role} Workspace</span>
+              </span>
+            </div>
             <p>
-              Signed in with <strong>{user?.role}</strong> role. Manage candidate evaluations, category scores, and AI summary reports below.
+              Manage evaluations, inspect category scores, and track candidate pipeline status in real time.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="welcome-actions">
             {isAdmin && (
               <button
                 onClick={() => setShowIntegrationsModal(true)}
-                className="btn-add-candidate"
-                style={{ background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1' }}
+                className="btn-banner-secondary"
                 title="Manage API Keys & Webhooks"
               >
-                <KeyRound size={18} style={{ color: '#4f46e5' }} />
+                <KeyRound size={16} />
                 <span>Integrations & API</span>
               </button>
             )}
@@ -361,37 +443,90 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="stats-grid">
-          <div className="stat-card">
+          {/* Card 1: All Active */}
+          <div
+            className={`stat-card clickable ${statusFilter === '' ? 'active-filter' : ''}`}
+            onClick={() => {
+              if (statusFilter !== '') {
+                setStatusFilter('');
+                setPage(1);
+              }
+            }}
+            title="Click to view all active candidates"
+          >
             <div className="stat-icon-wrapper primary">
-              <Users size={22} />
+              <Users size={20} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">{total}</span>
+              <div className="stat-header-row">
+                <span className="stat-value">{activeCount}</span>
+                {statusFilter === '' && <span className="filter-pill active">All Active</span>}
+              </div>
               <span className="stat-label">Active Candidates</span>
+              <span className="stat-hint">Full directory view</span>
             </div>
           </div>
 
-          <div className="stat-card">
+          {/* Card 2: New Submissions */}
+          <div
+            className={`stat-card clickable ${statusFilter === 'new' ? 'active-filter warning-border' : ''}`}
+            onClick={() => handleKpiFilterClick('new')}
+            title="Click to filter by New status"
+          >
             <div className="stat-icon-wrapper warning">
-              <FileCheck size={22} />
+              <Clock3 size={20} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">
-                {candidates.filter((c) => c.status === 'new').length}
-              </span>
+              <div className="stat-header-row">
+                <span className="stat-value">{newCount}</span>
+                {statusFilter === 'new' && <span className="filter-pill warning">Filtered</span>}
+              </div>
               <span className="stat-label">New Submissions</span>
+              <span className="stat-hint">
+                {statusFilter === 'new' ? 'Click to show all' : 'Awaiting review'}
+              </span>
             </div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-icon-wrapper success">
-              <Star size={22} />
+          {/* Card 3: In Review */}
+          <div
+            className={`stat-card clickable ${statusFilter === 'reviewed' ? 'active-filter info-border' : ''}`}
+            onClick={() => handleKpiFilterClick('reviewed')}
+            title="Click to filter by Reviewed status"
+          >
+            <div className="stat-icon-wrapper purple">
+              <FileCheck size={20} />
             </div>
             <div className="stat-info">
-              <span className="stat-value">
-                {candidates.filter((c) => c.status === 'hired').length}
+              <div className="stat-header-row">
+                <span className="stat-value">{inReviewCount}</span>
+                {statusFilter === 'reviewed' && <span className="filter-pill purple">Filtered</span>}
+              </div>
+              <span className="stat-label">Under Review</span>
+              <span className="stat-hint">
+                {statusFilter === 'reviewed' ? 'Click to show all' : 'In evaluation'}
               </span>
+            </div>
+          </div>
+
+          {/* Card 4: Hired */}
+          <div
+            className={`stat-card clickable ${statusFilter === 'hired' ? 'active-filter success-border' : ''}`}
+            onClick={() => handleKpiFilterClick('hired')}
+            title="Click to filter by Hired status"
+          >
+            <div className="stat-icon-wrapper success">
+              <Star size={20} />
+            </div>
+            <div className="stat-info">
+              <div className="stat-header-row">
+                <span className="stat-value">{hiredCount}</span>
+                {statusFilter === 'hired' && <span className="filter-pill success">Filtered</span>}
+              </div>
               <span className="stat-label">Hired Candidates</span>
+              <span className="stat-hint">
+                {statusFilter === 'hired' ? 'Click to show all' : 'Successful placements'}
+              </span>
             </div>
           </div>
         </div>
